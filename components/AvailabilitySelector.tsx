@@ -4,22 +4,22 @@ import React, { useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { format, addDays, startOfToday, eachDayOfInterval, isSameDay } from 'date-fns';
 import { es } from 'date-fns/locale';
-import { Check, Sun, Sunset, Moon, Coffee, Zap, Loader2 } from 'lucide-react';
+import { Check, Sun, Sunset, Moon, Coffee, Zap, Loader2, LucideIcon } from 'lucide-react';
 import { supabase } from '../lib/supabase';
 
 interface Moment {
     id: string;
     label: string;
     hours: string;
-    icon: React.ReactNode;
+    icon: LucideIcon;
     color: string;
 }
 
 const MOMENTS: Moment[] = [
-    { id: 'morning', label: 'Mañana', hours: '08:00 - 12:00', icon: <Coffee size={24} />, color: 'from-orange-400 to-yellow-500' },
-    { id: 'afternoon', label: 'Tarde', hours: '12:00 - 19:00', icon: <Sun size={24} />, color: 'from-pink-500 to-rose-500' },
-    { id: 'evening', label: 'Noche', hours: '19:00 - 00:00', icon: <Sunset size={24} />, color: 'from-purple-600 to-indigo-600' },
-    { id: 'late', label: 'Madrugada', hours: '00:00 - 04:00', icon: <Moon size={24} />, color: 'from-slate-700 to-zinc-900' },
+    { id: 'morning', label: 'Mañana', hours: '08:00 - 12:00', icon: Coffee, color: 'from-orange-400 to-yellow-500' },
+    { id: 'afternoon', label: 'Tarde', hours: '12:00 - 19:00', icon: Sun, color: 'from-pink-500 to-rose-500' },
+    { id: 'evening', label: 'Noche', hours: '19:00 - 00:00', icon: Sunset, color: 'from-purple-600 to-indigo-600' },
+    { id: 'late', label: 'Madrugada', hours: '00:00 - 04:00', icon: Moon, color: 'from-slate-700 to-zinc-900' },
 ];
 
 interface Selection {
@@ -134,7 +134,8 @@ export default function AvailabilitySelector({ onSaved }: Props) {
                 w-12 h-12 rounded-2xl flex items-center justify-center mb-4 transition-colors
                 ${isSelected ? 'bg-white/20' : 'bg-white/5 group-hover:bg-white/10'}
               `}>
-                                {React.cloneElement(moment.icon as React.ReactElement, {
+                                {React.createElement(moment.icon, {
+                                    size: 24,
                                     className: isSelected ? 'text-white' : 'text-zinc-500'
                                 })}
                             </div>
