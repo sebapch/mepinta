@@ -5,9 +5,9 @@ import { motion, AnimatePresence } from 'framer-motion';
 import {
   Users2, Plus, Share2, CheckCircle, LogOut, Zap,
   Coffee, Sun, Sunset, Moon, Check, Loader2, X,
-  MessageSquare, Flame, CalendarCheck
+  MessageSquare, Flame, CalendarCheck, Send, CornerDownRight
 } from 'lucide-react';
-import { format, addDays, startOfToday, eachDayOfInterval, isSameDay, parseISO, differenceInDays } from 'date-fns';
+import { format, addDays, startOfToday, eachDayOfInterval, isSameDay, parseISO } from 'date-fns';
 import { es } from 'date-fns/locale';
 import { supabase } from '../lib/supabase';
 import { useRouter } from 'next/navigation';
@@ -52,9 +52,10 @@ function computeGroupMetrics(availabilities: any[], groupMembers: any[]) {
 
 function computeMemberMetrics(userId: string, availabilities: any[]) {
   const mine = availabilities.filter(a => a.user_id === userId);
-  const totalDays = mine.length;
-  const totalMoments = mine.reduce((sum, a) => sum + (a.moments?.length || 0), 0);
-  return { totalDays, totalMoments };
+  return {
+    totalDays: mine.length,
+    totalMoments: mine.reduce((sum, a) => sum + (a.moments?.length || 0), 0),
+  };
 }
 
 // ── Main Page ──────────────────────────────────────────────────────
@@ -75,6 +76,12 @@ export default function Home() {
 
   const [groupMembers, setGroupMembers] = useState<any[]>([]);
   const [availabilities, setAvailabilities] = useState<any[]>([]);
+
+  // Comments (replies)
+  const [comments, setComments] = useState<Record<string, any[]>>({}); // availabilityId → comments[]
+  const [replyingTo, setReplyingTo] = useState<string | null>(null);   // availabilityId
+  const [replyDraft, setReplyDraft] = useState('');
+  const [sendingReply, setSendingReply] = useState(false);
 
   const [selectedDay, setSelectedDay] = useState(today);
   const [mySelection, setMySelection] = useState<Record<string, string[]>>({});
@@ -101,8 +108,7 @@ export default function Home() {
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) return;
     const { data } = await supabase
-      .from('groups')
-      .select('*, group_members!inner(*)')
+      .from('groups').select('*, group_members!inner(*)')
       .eq('group_members.user_id', user.id);
     const fetched = data || [];
     setGroups(fetched);
@@ -120,14 +126,60 @@ export default function Home() {
     if (!members) return;
     const profiles = members.map((m: any) => m.profiles).filter(Boolean);
     setGroupMembers(profiles);
+
     const ids = profiles.map((p: any) => p.id);
     if (!ids.length) return;
+
     const { data: avails } = await supabase
       .from('availability').select('*')
       .in('user_id', ids)
       .gte('day', format(today, 'yyyy-MM-dd'))
       .order('day');
-    setAvailabilities(avails || []);
+    const fetchedAvails = avails || [];
+    setAvailabilities(fetchedAvails);
+
+    // Fetch comments for all these availability slots
+    const availIds = fetchedAvails.map(a => a.id);
+    if (availIds.length > 0) {
+      const { data: cmts } = await supabase
+        .from('comments').select('*, profiles(*)')
+        .in('availability_id', availIds)
+        .order('created_at');
+      // Group by availability_id
+      const grouped: Record<string, any[]> = {};
+      (cmts || []).forEach(c => {
+        if (!grouped[c.availability_id]) grouped[c.availability_id] = [];
+        grouped[c.availability_id].push(c);
+      });
+      setComments(grouped);
+    }
+  };
+
+  const postReply = async (availabilityId: string) => {
+    if (!replyDraft.trim()) return;
+    setSendingReply(true);
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) return;
+    await supabase.from('comments').insert({
+      availability_id: availabilityId,
+      user_id: user.id,
+      content: replyDraft.trim(),
+    });
+    setReplyDraft('');
+    setReplyingTo(null);
+    setSendingReply(false);
+    // Refresh comments
+    const availIds = availabilities.map(a => a.id);
+    const { data: cmts } = await supabase
+      .from('comments').select('*, profiles(*)')
+      .in('availability_id', availIds)
+      .order('created_at');
+    const grouped: Record<string, any[]> = {};
+    (cmts || []).forEach(c => {
+      if (!grouped[c.availability_id]) grouped[c.availability_id] = [];
+      grouped[c.availability_id].push(c);
+    });
+    setComments(grouped);
   };
 
   const saveAvailability = async () => {
@@ -184,8 +236,6 @@ export default function Home() {
   const currentMoments = mySelection[dayStr] || [];
   const currentNote = myNotes[dayStr] || '';
   const groupMetrics = useMemo(() => computeGroupMetrics(availabilities, groupMembers), [availabilities, groupMembers]);
-
-  // Group availability by day for agenda
   const availByDay = useMemo(() => {
     const map: Record<string, any[]> = {};
     availabilities.forEach(slot => {
@@ -281,7 +331,6 @@ export default function Home() {
 
                   {isSelected && (
                     <>
-                      {/* Group metrics */}
                       {groupMetrics && (
                         <>
                           <div className="mt-3 grid grid-cols-3 gap-1.5">
@@ -302,7 +351,8 @@ export default function Home() {
                             <div className="mt-2 flex items-center gap-1.5 bg-pink-500/5 rounded-xl px-2.5 py-1.5">
                               <CalendarCheck size={11} className="text-pink-400 shrink-0" />
                               <p className="text-[10px] text-zinc-400">
-                                Mejor día: <span className="font-bold text-pink-300 capitalize">
+                                Mejor día:{' '}
+                                <span className="font-bold text-pink-300 capitalize">
                                   {format(parseISO(groupMetrics.bestDay[0]), "EEEE d/M", { locale: es })}
                                 </span>
                                 <span className="text-zinc-600 ml-1">({groupMetrics.bestDay[1].size} pibes)</span>
@@ -312,7 +362,6 @@ export default function Home() {
                         </>
                       )}
 
-                      {/* Invite link */}
                       <button
                         onClick={e => { e.stopPropagation(); handleCopyLink(group.id); }}
                         className={`mt-2.5 w-full py-1.5 rounded-xl text-[11px] font-bold flex items-center justify-center gap-1.5 transition-all border ${copiedId === group.id
@@ -323,7 +372,6 @@ export default function Home() {
                         {copiedId === group.id ? <><CheckCircle size={12} /> ¡Link copiado!</> : <><Share2 size={12} /> Invitar amigos</>}
                       </button>
 
-                      {/* Members */}
                       {groupMembers.length > 0 && (
                         <div className="mt-3 pt-3 border-t border-white/8">
                           <p className="text-[9px] font-black uppercase tracking-widest text-zinc-600 mb-2">Miembros</p>
@@ -344,9 +392,7 @@ export default function Home() {
                                         : 'Sin pinta marcada'}
                                     </p>
                                   </div>
-                                  {stats.totalMoments >= 4 && (
-                                    <Flame size={12} className="text-orange-400 shrink-0" />
-                                  )}
+                                  {stats.totalMoments >= 4 && <Flame size={12} className="text-orange-400 shrink-0" />}
                                 </div>
                               );
                             })}
@@ -368,7 +414,6 @@ export default function Home() {
             <p className="text-[10px] text-zinc-700 mt-0.5">Marcá cuándo tenés tiempo libre esta semana</p>
           </div>
 
-          {/* Day selector */}
           <div className="flex gap-2 overflow-x-auto pb-1 scrollbar-hide">
             {week.map(day => {
               const ds = format(day, 'yyyy-MM-dd');
@@ -391,7 +436,6 @@ export default function Home() {
             })}
           </div>
 
-          {/* Moment cards */}
           <div className="grid grid-cols-2 gap-3 flex-1">
             {MOMENTS.map(({ id, label, hours, icon: Icon, color }) => {
               const isOn = currentMoments.includes(id);
@@ -422,7 +466,6 @@ export default function Home() {
             })}
           </div>
 
-          {/* Note field */}
           <div className="relative">
             <MessageSquare size={14} className="absolute left-3.5 top-3.5 text-zinc-600 pointer-events-none" />
             <input
@@ -435,19 +478,14 @@ export default function Home() {
             />
           </div>
 
-          {/* Save */}
           <button
             onClick={saveAvailability}
             disabled={saving || currentMoments.length === 0}
             className="w-full py-3.5 premium-gradient text-white font-black rounded-2xl shadow-lg shadow-pink-500/20 hover:scale-[1.01] active:scale-[0.98] transition-all disabled:opacity-40 disabled:cursor-not-allowed flex items-center justify-center gap-2"
           >
-            {saving ? (
-              <Loader2 size={18} className="animate-spin" />
-            ) : saved ? (
-              <><CheckCircle size={18} /> ¡Pinta confirmada!</>
-            ) : (
-              <><Zap size={18} fill="currentColor" /> Confirmar pinta</>
-            )}
+            {saving ? <Loader2 size={18} className="animate-spin" />
+              : saved ? <><CheckCircle size={18} /> ¡Pinta confirmada!</>
+                : <><Zap size={18} fill="currentColor" /> Confirmar pinta</>}
           </button>
         </section>
 
@@ -464,10 +502,7 @@ export default function Home() {
                 <p className="text-[10px] font-black text-pink-500 uppercase tracking-[0.2em]">Agenda de</p>
                 <div className="flex items-center justify-between">
                   <h2 className="font-black text-xl uppercase italic">{selectedGroup.name}</h2>
-                  <button
-                    onClick={fetchGroupData}
-                    className="text-[10px] font-bold text-zinc-700 hover:text-zinc-400 uppercase tracking-wider transition-colors"
-                  >
+                  <button onClick={fetchGroupData} className="text-[10px] font-bold text-zinc-700 hover:text-zinc-400 uppercase tracking-wider transition-colors">
                     Actualizar
                   </button>
                 </div>
@@ -482,7 +517,6 @@ export default function Home() {
                   </div>
                 </div>
               ) : (
-                /* ── Grouped by day ── */
                 <div className="space-y-6">
                   {Object.entries(availByDay).map(([day, slots]) => {
                     const isToday = day === format(today, 'yyyy-MM-dd');
@@ -499,7 +533,6 @@ export default function Home() {
                             <p className="text-[9px] font-bold opacity-60 capitalize leading-none">{format(parseISO(day), 'MMM', { locale: es })}</p>
                           </div>
                           <div className="flex-1 border-t border-white/8" />
-                          {/* Avatar stack + count */}
                           <div className="flex items-center gap-1.5 bg-white/5 rounded-full px-2.5 py-1 shrink-0">
                             <div className="flex -space-x-2">
                               {slots.slice(0, 4).map((s: any) => {
@@ -511,48 +544,123 @@ export default function Home() {
                           </div>
                         </div>
 
-                        {/* Member cards for this day */}
+                        {/* Member cards */}
                         <div className="space-y-2 ml-1">
                           {slots.map((slot: any) => {
                             const member = groupMembers.find(m => m.id === slot.user_id);
                             if (!member) return null;
                             const isMe = member.id === user.id;
                             const stats = computeMemberMetrics(member.id, availabilities);
+                            const slotComments = comments[slot.id] || [];
+                            const isReplying = replyingTo === slot.id;
+
                             return (
                               <div
                                 key={slot.id}
                                 className={`rounded-2xl p-3.5 border-l-[3px] ${isMe ? 'bg-purple-500/5 border-l-purple-500' : 'bg-white/3 border-l-pink-500/50'
                                   }`}
                               >
+                                {/* Member row */}
                                 <div className="flex items-center gap-2.5">
                                   <img src={member.avatar_url} alt={member.full_name} className="w-8 h-8 rounded-full border border-white/10 shrink-0" />
                                   <div className="flex-1 min-w-0">
                                     <div className="flex items-center gap-2 flex-wrap">
                                       <p className="font-bold text-sm">{isMe ? 'Vos' : member.full_name?.split(' ')[0]}</p>
                                       {stats.totalMoments >= 4 && <Flame size={12} className="text-orange-400" />}
-                                      <span className={`text-[9px] px-2 py-0.5 rounded-full font-bold ${isMe ? 'bg-purple-500/15 text-purple-400' : 'bg-pink-500/10 text-pink-400'
-                                        }`}>
+                                      <span className={`text-[9px] px-2 py-0.5 rounded-full font-bold ${isMe ? 'bg-purple-500/15 text-purple-400' : 'bg-pink-500/10 text-pink-400'}`}>
                                         {stats.totalDays} día{stats.totalDays !== 1 ? 's' : ''} esta semana
                                       </span>
                                     </div>
-                                    {/* Moment pills */}
                                     <div className="flex flex-wrap gap-1 mt-1.5">
                                       {slot.moments?.map((m: string) => (
-                                        <span key={m} className={`text-[10px] px-2 py-0.5 rounded-full font-bold ${isMe ? 'bg-purple-500/15 text-purple-300' : 'bg-pink-500/10 text-pink-300'
-                                          }`}>
+                                        <span key={m} className={`text-[10px] px-2 py-0.5 rounded-full font-bold ${isMe ? 'bg-purple-500/15 text-purple-300' : 'bg-pink-500/10 text-pink-300'}`}>
                                           {MOMENT_LABEL[m] || m}
                                         </span>
                                       ))}
                                     </div>
                                   </div>
                                 </div>
+
                                 {/* Note */}
                                 {slot.note && (
                                   <div className="mt-2 flex items-start gap-2 bg-white/5 rounded-xl px-3 py-2">
                                     <MessageSquare size={11} className="text-zinc-500 shrink-0 mt-0.5" />
-                                    <p className="text-[11px] text-zinc-300 italic">"{slot.note}"</p>
+                                    <p className="text-[11px] text-zinc-300 italic flex-1">"{slot.note}"</p>
                                   </div>
                                 )}
+
+                                {/* Existing replies */}
+                                {slotComments.length > 0 && (
+                                  <div className="mt-2 ml-3 space-y-1.5">
+                                    {slotComments.map(c => {
+                                      const commenter = c.profiles;
+                                      const commentIsMe = c.user_id === user.id;
+                                      return (
+                                        <div key={c.id} className="flex items-start gap-2">
+                                          <CornerDownRight size={12} className="text-zinc-700 shrink-0 mt-1" />
+                                          <img
+                                            src={commenter?.avatar_url}
+                                            alt={commenter?.full_name}
+                                            className="w-5 h-5 rounded-full border border-white/10 shrink-0"
+                                          />
+                                          <div className={`flex-1 rounded-xl px-2.5 py-1.5 ${commentIsMe ? 'bg-purple-500/10' : 'bg-white/5'}`}>
+                                            <span className="text-[10px] font-bold text-zinc-400 mr-1.5">
+                                              {commentIsMe ? 'Vos' : commenter?.full_name?.split(' ')[0]}
+                                            </span>
+                                            <span className="text-[11px] text-zinc-300">{c.content}</span>
+                                          </div>
+                                        </div>
+                                      );
+                                    })}
+                                  </div>
+                                )}
+
+                                {/* Reply controls */}
+                                <div className="mt-2 ml-3">
+                                  <AnimatePresence>
+                                    {isReplying ? (
+                                      <motion.div
+                                        initial={{ opacity: 0, height: 0 }}
+                                        animate={{ opacity: 1, height: 'auto' }}
+                                        exit={{ opacity: 0, height: 0 }}
+                                        className="flex items-center gap-2"
+                                      >
+                                        <CornerDownRight size={12} className="text-zinc-700 shrink-0" />
+                                        <input
+                                          autoFocus
+                                          type="text"
+                                          value={replyDraft}
+                                          onChange={e => setReplyDraft(e.target.value)}
+                                          onKeyDown={e => e.key === 'Enter' && postReply(slot.id)}
+                                          placeholder="Escribí tu respuesta..."
+                                          maxLength={200}
+                                          className="flex-1 bg-white/5 border border-white/10 rounded-xl px-3 py-1.5 text-xs text-zinc-200 placeholder-zinc-700 focus:outline-none focus:border-pink-500/50 transition-colors"
+                                        />
+                                        <button
+                                          onClick={() => postReply(slot.id)}
+                                          disabled={sendingReply || !replyDraft.trim()}
+                                          className="w-7 h-7 bg-pink-500 hover:bg-pink-400 rounded-full flex items-center justify-center transition-colors disabled:opacity-40 shrink-0"
+                                        >
+                                          {sendingReply ? <Loader2 size={12} className="animate-spin text-white" /> : <Send size={12} className="text-white" />}
+                                        </button>
+                                        <button
+                                          onClick={() => { setReplyingTo(null); setReplyDraft(''); }}
+                                          className="w-7 h-7 bg-white/5 hover:bg-white/10 rounded-full flex items-center justify-center text-zinc-500 transition-colors shrink-0"
+                                        >
+                                          <X size={12} />
+                                        </button>
+                                      </motion.div>
+                                    ) : (
+                                      <button
+                                        onClick={() => setReplyingTo(slot.id)}
+                                        className="flex items-center gap-1.5 text-[10px] text-zinc-600 hover:text-zinc-400 font-bold transition-colors group"
+                                      >
+                                        <CornerDownRight size={11} className="group-hover:text-pink-500 transition-colors" />
+                                        Responder{slotComments.length > 0 ? ` (${slotComments.length})` : ''}
+                                      </button>
+                                    )}
+                                  </AnimatePresence>
+                                </div>
                               </div>
                             );
                           })}
