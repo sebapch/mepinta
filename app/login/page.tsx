@@ -18,13 +18,12 @@ export default function LoginPage() {
     };
 
     return (
-        <div className="min-h-screen flex items-center justify-center p-4 bg-background">
+        <div className="min-h-screen flex items-center justify-center p-4 bg-black">
             <div className="absolute inset-0 overflow-hidden pointer-events-none">
-                <div className="absolute top-[-10%] left-[-10%] w-[40%] h-[40%] bg-pink-500/20 blur-[120px] rounded-full animate-float" />
-                <div className="absolute bottom-[-10%] right-[-10%] w-[40%] h-[40%] bg-purple-500/20 blur-[120px] rounded-full animate-float" style={{ animationDelay: '2s' }} />
+                <div className="absolute top-[-10%] left-[-10%] w-[40%] h-[40%] bg-pink-500/10 blur-[120px] rounded-full animate-float" />
+                <div className="absolute bottom-[-10%] right-[-10%] w-[40%] h-[40%] bg-purple-500/10 blur-[120px] rounded-full animate-float" style={{ animationDelay: '2s' }} />
             </div>
 
-            {/* Language Switcher */}
             <div className="absolute top-6 right-6">
                 <button
                     onClick={() => setLanguage(language === 'es' ? 'en' : 'es')}
@@ -37,10 +36,10 @@ export default function LoginPage() {
             <motion.div
                 initial={{ opacity: 0, y: 20 }}
                 animate={{ opacity: 1, y: 0 }}
-                className="w-full max-w-md"
+                className="w-full max-w-md relative z-10"
             >
                 <div className="text-center mb-10">
-                    <div className="w-20 h-20 bg-gradient-to-br from-pink-500 to-purple-500 rounded-3xl flex items-center justify-center mx-auto mb-6 shadow-2xl shadow-pink-500/20">
+                    <div className="w-20 h-20 bg-premium-gradient rounded-3xl flex items-center justify-center mx-auto mb-6 shadow-2xl shadow-pink-500/20">
                         <Zap size={40} className="text-white" fill="currentColor" />
                     </div>
                     <h1 className="text-5xl font-black italic tracking-tighter text-white mb-2">{t.login.title}</h1>
@@ -68,3 +67,9 @@ export default function LoginPage() {
         </div>
     );
 }
+
+const premium_gradient_style = `
+.bg-premium-gradient {
+    background: linear-gradient(135deg, #9d50bb, #ff2d75);
+}
+`;

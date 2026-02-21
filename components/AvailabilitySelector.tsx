@@ -23,7 +23,7 @@ const MOMENTS: Moment[] = [
 ];
 
 interface Selection {
-    [day: string]: string[]; // day string -> array of moment ids
+    [day: string]: string[];
 }
 
 interface Props {
@@ -62,7 +62,6 @@ export default function AvailabilitySelector({ onSaved }: Props) {
             onSaved?.();
         } catch (error: any) {
             console.error('Error saving availability:', error);
-            alert('Error al guardar: ' + error.message);
         } finally {
             setSaving(false);
         }
@@ -83,7 +82,6 @@ export default function AvailabilitySelector({ onSaved }: Props) {
 
     return (
         <div className="flex flex-col h-full max-h-[80vh]">
-            {/* Day Selector - Horizontal Pills */}
             <div className="flex gap-3 overflow-x-auto pb-6 scrollbar-hide px-1">
                 {week.map((day) => {
                     const isSelected = isSameDay(day, selectedDay);
@@ -113,7 +111,6 @@ export default function AvailabilitySelector({ onSaved }: Props) {
                 })}
             </div>
 
-            {/* Moments Grid - Large, Easy-to-tap cards */}
             <div className="flex-1 grid grid-cols-2 gap-4">
                 {MOMENTS.map((moment) => {
                     const isSelected = currentSelection.includes(moment.id);
@@ -129,7 +126,6 @@ export default function AvailabilitySelector({ onSaved }: Props) {
                                     : 'bg-white/5 border border-white/5 hover:bg-white/10'}
               `}
                         >
-                            {/* Icon & Accent */}
                             <div className={`
                 w-12 h-12 rounded-2xl flex items-center justify-center mb-4 transition-colors
                 ${isSelected ? 'bg-white/20' : 'bg-white/5 group-hover:bg-white/10'}
@@ -149,7 +145,6 @@ export default function AvailabilitySelector({ onSaved }: Props) {
                                 </p>
                             </div>
 
-                            {/* Selection Checkmark */}
                             <AnimatePresence>
                                 {isSelected && (
                                     <motion.div
@@ -167,17 +162,16 @@ export default function AvailabilitySelector({ onSaved }: Props) {
                 })}
             </div>
 
-            {/* Quick Summary Footer */}
             <div className="mt-8 pt-6 border-t border-white/10 flex items-center justify-between">
                 <div className="flex items-center gap-2">
                     <div className="w-10 h-10 rounded-full bg-pink-500/20 flex items-center justify-center text-pink-500">
                         <Zap size={20} fill="currentColor" />
                     </div>
                     <div>
-                        <p className="text-[10px] font-bold uppercase tracking-widest text-zinc-500">Estado hoy</p>
+                        <p className="text-[10px] font-bold uppercase tracking-widest text-zinc-500">MePinta</p>
                         <p className="text-sm font-bold text-white">
                             {currentSelection.length > 0
-                                ? `${currentSelection.length} momentos marcados`
+                                ? `${currentSelection.length} momentos`
                                 : 'Sin actividad'}
                         </p>
                     </div>

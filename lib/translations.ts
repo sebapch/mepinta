@@ -60,6 +60,7 @@ export const translations = {
             dayThisWeek: 'día esta semana',
             reply: 'Responder',
             replyPlaceholder: 'Escriba su respuesta...',
+            replyingTo: 'Respondiendo a',
         },
         game: {
             playBtn: 'Jugar',
@@ -152,6 +153,7 @@ export const translations = {
             dayThisWeek: 'day this week',
             reply: 'Reply',
             replyPlaceholder: 'Write your reply...',
+            replyingTo: 'Replying to',
         },
         game: {
             playBtn: 'Play',
@@ -174,7 +176,7 @@ export const translations = {
             footer: 'Private • Secure • Between Friends',
         },
         join: {
-            title: 'INVITATION 👋',
+            title: 'ME PINTA SUMARME 👋',
             subtitle: 'You have been invited to join the group',
             description: 'Access the shared agenda and coordinate your schedule with the team.',
             joinBtn: 'JOIN GROUP',

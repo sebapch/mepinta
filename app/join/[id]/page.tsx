@@ -6,7 +6,6 @@ import { supabase } from '../../../lib/supabase';
 import { motion } from 'framer-motion';
 import { Users2, Loader2, CheckCircle2, AlertCircle } from 'lucide-react';
 import { GlassCard } from '../../../components/UI';
-
 import { useLanguage } from '../../../components/LanguageContext';
 
 export default function JoinGroupPage() {
@@ -34,10 +33,8 @@ export default function JoinGroupPage() {
 
             setGroup(data);
 
-            // Check if user is logged in
             const { data: { session } } = await supabase.auth.getSession();
             if (!session) {
-                // Save invite to localStorage to join after login
                 localStorage.setItem('pending_invite', id as string);
                 router.push('/login');
                 return;
@@ -84,7 +81,7 @@ export default function JoinGroupPage() {
                     <p className="text-zinc-500 mb-8">{error}</p>
                     <button
                         onClick={() => router.push('/')}
-                        className="px-8 py-3 premium-gradient rounded-2xl font-bold text-white"
+                        className="px-8 py-3 premium-gradient rounded-2xl font-bold text-white uppercase"
                     >
                         VOLVER AL INICIO
                     </button>
