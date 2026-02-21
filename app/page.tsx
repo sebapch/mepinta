@@ -254,33 +254,33 @@ export default function Home() {
         <h1 className="text-2xl font-black italic bg-gradient-to-r from-pink-500 to-purple-500 bg-clip-text text-transparent tracking-tight">
           {t.common.appName}
         </h1>
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-1 md:gap-2">
           <button onClick={() => (window as any).startMepintaTour?.()}
-            className="p-2 rounded-full bg-white/5 hover:bg-white/10 text-zinc-400 transition-all" title={language === 'es' ? 'Ayuda' : 'Help'}>
+            className="p-1.5 md:p-2 rounded-full bg-white/5 hover:bg-white/10 text-zinc-400 transition-all shrink" title={language === 'es' ? 'Ayuda' : 'Help'}>
             <HelpCircle size={18} />
           </button>
           <button onClick={() => setLanguage(language === 'es' ? 'en' : 'es')}
-            className="flex items-center gap-2 bg-white/5 hover:bg-white/10 border border-white/10 text-zinc-400 font-bold text-xs rounded-full px-3 py-1.5 transition-all">
+            className="flex items-center gap-1.5 bg-white/5 hover:bg-white/10 border border-white/10 text-zinc-400 font-bold text-[10px] md:text-xs rounded-full px-2 md:px-3 py-1.5 transition-all shrink">
             {language === 'es' ? 'EN' : 'ES'}
           </button>
           <button id="tour-game" onClick={() => setIsGameOpen(true)}
-            className="flex items-center gap-2 bg-purple-500/15 hover:bg-purple-500/25 border border-purple-500/20 text-purple-300 hover:text-purple-200 font-bold text-sm rounded-full px-3.5 py-1.5 transition-all">
+            className="flex items-center gap-2 bg-purple-500/15 hover:bg-purple-500/25 border border-purple-500/20 text-purple-300 hover:text-purple-200 font-bold text-xs md:text-sm rounded-full px-2.5 md:px-3.5 py-1.5 transition-all shrink">
             <Gamepad2 size={15} />
-            <span className="hidden sm:inline">{t.game.playBtn}</span>
+            <span className="hidden lg:inline">{t.game.playBtn}</span>
             {myBest > 0 && <span className="text-[10px] bg-purple-500/20 rounded-full px-1.5 font-black">{myBest}</span>}
           </button>
-          <div className="flex items-center gap-2 bg-white/5 rounded-full py-1.5 px-3">
-            <img src={user.user_metadata.avatar_url || `https://api.dicebear.com/7.x/avataaars/svg?seed=${user.email}`} className="w-6 h-6 rounded-full" alt="" />
-            <span className="text-sm font-semibold text-zinc-300 hidden sm:inline">{user.user_metadata.full_name?.split(' ')[0]}</span>
+          <div className="flex items-center gap-1.5 md:gap-2 bg-white/5 rounded-full py-1.5 px-2 md:px-3 shrink">
+            <img src={user.user_metadata.avatar_url || `https://api.dicebear.com/7.x/avataaars/svg?seed=${user.email}`} className="w-5 h-5 md:w-6 md:h-6 rounded-full" alt="" />
+            <span className="text-xs md:text-sm font-semibold text-zinc-300 hidden sm:inline">{user.user_metadata.full_name?.split(' ')[0]}</span>
           </div>
           <button onClick={() => supabase.auth.signOut().then(() => router.push('/login'))}
-            className="p-2 rounded-full bg-white/5 hover:bg-red-500/10 text-zinc-500 hover:text-red-400 transition-colors" title={t.auth.logout}>
+            className="p-1.5 md:p-2 rounded-full bg-white/5 hover:bg-red-500/10 text-zinc-500 hover:text-red-400 transition-colors shrink" title={t.auth.logout}>
             <LogOut size={16} />
           </button>
         </div>
       </header>
 
-      <div className="grid grid-cols-1 lg:grid-cols-[280px_1fr_1fr] min-h-[calc(100vh-57px)]">
+      <div className="grid grid-cols-1 lg:grid-cols-[280px_1fr_1fr] min-h-[calc(100vh-57px)] w-full max-w-full overflow-x-hidden">
         <aside id="tour-groups" className="border-r border-white/5 p-4 space-y-2 overflow-y-auto">
           <div className="flex items-center justify-between mb-3 px-1">
             <h2 className="text-[10px] font-black uppercase tracking-[0.2em] text-zinc-500">{t.groups.title}</h2>

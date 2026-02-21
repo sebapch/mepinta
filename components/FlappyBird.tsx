@@ -280,8 +280,8 @@ export default function FlappyBird({ onClose, onGameOver, personalBest }: Props)
                     </div>
                 </div>
 
-                <div className="relative">
-                    <canvas ref={canvasRef} width={W} height={H} className="rounded-3xl cursor-pointer border border-white/10 shadow-2xl shadow-purple-500/20" onClick={jump} style={{ touchAction: 'none' }} onTouchStart={e => { e.preventDefault(); jump(); }} />
+                <div className="relative w-full flex justify-center">
+                    <canvas ref={canvasRef} width={W} height={H} className="rounded-3xl cursor-pointer border border-white/10 shadow-2xl shadow-purple-500/20 max-w-full h-auto" onClick={jump} style={{ touchAction: 'none' }} onTouchStart={e => { e.preventDefault(); jump(); }} />
                     <AnimatePresence>
                         {gameState === 'dead' && (
                             <motion.div initial={{ opacity: 0, scale: 0.85 }} animate={{ opacity: 1, scale: 1 }} className="absolute inset-0 flex flex-col items-center justify-center rounded-3xl bg-black/70 backdrop-blur-sm p-8 text-center">

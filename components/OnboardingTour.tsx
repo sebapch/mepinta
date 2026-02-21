@@ -17,14 +17,17 @@ export default function OnboardingTour({ userId, hasSeenTour, onTourComplete }: 
     const driverRef = useRef<any>(null);
 
     const startTour = useCallback(() => {
+        const isMobile = window.innerWidth < 768;
+
         const driverObj = driver({
             showProgress: true,
             animate: true,
             nextBtnText: t.tour.next,
             prevBtnText: t.tour.prev,
             doneBtnText: t.tour.done,
-            showButtons: ['next', 'previous'],
+            showButtons: ['next', 'previous', 'close'],
             allowClose: true,
+            overlayColor: 'rgba(0, 0, 0, 0.9)',
             steps: [
                 {
                     element: '#tour-header',
@@ -40,8 +43,8 @@ export default function OnboardingTour({ userId, hasSeenTour, onTourComplete }: 
                     popover: {
                         title: t.tour.groupsTitle,
                         description: t.tour.groupsDesc,
-                        side: "right",
-                        align: 'start'
+                        side: isMobile ? "bottom" : "right",
+                        align: isMobile ? 'center' : 'start'
                     }
                 },
                 {
@@ -49,8 +52,8 @@ export default function OnboardingTour({ userId, hasSeenTour, onTourComplete }: 
                     popover: {
                         title: t.tour.availabilityTitle,
                         description: t.tour.availabilityDesc,
-                        side: "bottom",
-                        align: 'start'
+                        side: isMobile ? "top" : "bottom",
+                        align: isMobile ? 'center' : 'start'
                     }
                 },
                 {
@@ -67,8 +70,8 @@ export default function OnboardingTour({ userId, hasSeenTour, onTourComplete }: 
                     popover: {
                         title: t.tour.agendaTitle,
                         description: t.tour.agendaDesc,
-                        side: "left",
-                        align: 'start'
+                        side: isMobile ? "top" : "left",
+                        align: isMobile ? 'center' : 'start'
                     }
                 },
                 {
@@ -76,7 +79,7 @@ export default function OnboardingTour({ userId, hasSeenTour, onTourComplete }: 
                     popover: {
                         title: t.tour.gameTitle,
                         description: t.tour.gameDesc,
-                        side: "bottom",
+                        side: isMobile ? "bottom" : "bottom",
                         align: 'end'
                     }
                 }
