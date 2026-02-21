@@ -5,7 +5,8 @@ import { motion, AnimatePresence } from 'framer-motion';
 import {
   Users2, Plus, Share2, CheckCircle, LogOut, Zap,
   Coffee, Sun, Sunset, Moon, Check, Loader2, X,
-  MessageSquare, Flame, CalendarCheck, Send, CornerDownRight, Trophy, Gamepad2, HelpCircle
+  MessageSquare, Flame, CalendarCheck, Send, CornerDownRight, Trophy, Gamepad2, HelpCircle,
+  ChevronDown
 } from 'lucide-react';
 import { format, addDays, startOfToday, eachDayOfInterval, isSameDay, parseISO } from 'date-fns';
 import { es } from 'date-fns/locale';
@@ -102,6 +103,7 @@ export default function Home() {
   const [groupScores, setGroupScores] = useState<any[]>([]);
   const [myBest, setMyBest] = useState(0);
   const [hasSeenTour, setHasSeenTour] = useState(true); // Default to true to prevent flash
+  const [mobileGroupOpen, setMobileGroupOpen] = useState(false);
 
   useEffect(() => {
     supabase.auth.getSession().then(({ data: { session } }) => {
@@ -318,8 +320,99 @@ export default function Home() {
         </div>
       </header>
 
-      <div className="grid grid-cols-1 lg:grid-cols-[280px_1fr_1fr] min-h-[calc(100vh-57px)] w-full max-w-full overflow-x-hidden">
-        <aside id="tour-groups" className="border-r border-white/5 p-4 space-y-2 overflow-y-auto">
+      {/* ── Mobile Group Selector ──────────────────────────────── */}
+      <div className="lg:hidden sticky top-[57px] z-40 bg-[#0a0a0a]/98 backdrop-blur-xl border-b border-white/8">
+        <button
+          onClick={() => setMobileGroupOpen(v => !v)}
+          className="w-full flex items-center gap-3 px-4 py-3"
+        >
+          <div className={`w-8 h-8 rounded-xl flex items-center justify-center shrink-0 ${selectedGroup ? 'bg-pink-500' : 'bg-white/10'}`}>
+            <Users2 size={15} className={selectedGroup ? 'text-white' : 'text-zinc-500'} />
+          </div>
+          <div className="flex-1 text-left min-w-0">
+            <p className="text-sm font-black text-white truncate">
+              {selectedGroup ? selectedGroup.name : t.groups.title}
+            </p>
+            {selectedGroup && groupMetrics && (
+              <p className={`text-[10px] font-bold ${groupMetrics.activityColor}`}>{groupMetrics.activityLabel}</p>
+            )}
+            {!selectedGroup && (
+              <p className="text-[10px] text-zinc-600">{t.groups.createFirst}</p>
+            )}
+          </div>
+          {selectedGroup?.invite_code && (
+            <span className="text-xs font-black tracking-[0.2em] text-pink-400/70 shrink-0">{selectedGroup.invite_code}</span>
+          )}
+          <ChevronDown size={16} className={`text-zinc-500 transition-transform duration-300 shrink-0 ${mobileGroupOpen ? 'rotate-180' : ''}`} />
+        </button>
+
+        <AnimatePresence>
+          {mobileGroupOpen && (
+            <motion.div
+              initial={{ height: 0, opacity: 0 }}
+              animate={{ height: 'auto', opacity: 1 }}
+              exit={{ height: 0, opacity: 0 }}
+              transition={{ duration: 0.22, ease: 'easeInOut' }}
+              className="overflow-hidden border-t border-white/5"
+            >
+              <div className="px-4 py-3 space-y-2">
+                {groups.length === 0 ? (
+                  <div className="flex flex-col gap-2">
+                    <button onClick={() => { setIsGroupModalOpen(true); setMobileGroupOpen(false); }}
+                      className="w-full py-4 border-2 border-dashed border-white/10 rounded-2xl flex items-center justify-center gap-2 hover:border-pink-500/30 hover:bg-pink-500/5 transition-all">
+                      <Plus size={16} className="text-zinc-500" />
+                      <span className="text-xs text-zinc-500 font-bold">{t.groups.createFirst}</span>
+                    </button>
+                    <button onClick={() => { setIsJoinModalOpen(true); setMobileGroupOpen(false); }}
+                      className="w-full py-3 border border-white/10 rounded-2xl flex items-center justify-center gap-2 text-zinc-600 hover:text-purple-400 transition-all text-xs font-bold">
+                      <Users2 size={14} />{t.groups.joinGroupBtn}
+                    </button>
+                  </div>
+                ) : (
+                  <>
+                    {groups.map(group => {
+                      const isSel = selectedGroup?.id === group.id;
+                      return (
+                        <div key={group.id} onClick={() => { setSelectedGroup(group); setMobileGroupOpen(false); }}
+                          className={`rounded-2xl p-3 cursor-pointer transition-all border flex items-center gap-3 ${isSel ? 'bg-pink-500/10 border-pink-500/30' : 'bg-white/3 border-transparent'}`}>
+                          <div className={`w-8 h-8 rounded-xl flex items-center justify-center shrink-0 ${isSel ? 'bg-pink-500' : 'bg-white/10'}`}>
+                            <Users2 size={14} className={isSel ? 'text-white' : 'text-zinc-500'} />
+                          </div>
+                          <div className="flex-1 min-w-0">
+                            <p className={`font-bold text-sm truncate ${isSel ? 'text-white' : 'text-zinc-300'}`}>{group.name}</p>
+                            {group.invite_code && <p className="text-[10px] font-black tracking-[0.2em] text-pink-400/60">{group.invite_code}</p>}
+                          </div>
+                          {isSel && <div className="w-2 h-2 rounded-full bg-pink-500 animate-pulse shrink-0" />}
+                        </div>
+                      );
+                    })}
+                  </>
+                )}
+              </div>
+            </motion.div>
+          )}
+        </AnimatePresence>
+
+        {/* ── Always-visible stat cards ── */}
+        {selectedGroup && groupMetrics && (
+          <div className="grid grid-cols-3 gap-2 px-4 pb-3">
+            {[
+              { val: `${groupMetrics.pintaPercent}%`, label: t.groups.availabilityLabel, color: 'text-pink-400' },
+              { val: groupMetrics.totalSlots, label: t.groups.timeSlots, color: 'text-blue-400' },
+              { val: `${groupMetrics.membersWithPinta}/${groupMetrics.totalMembers}`, label: t.groups.activeMembers, color: 'text-green-400' },
+            ].map(m => (
+              <div key={m.label} className="bg-white/[0.04] border border-white/8 rounded-2xl p-2.5 text-center">
+                <p className={`text-lg font-black ${m.color}`}>{m.val}</p>
+                <p className="text-[9px] text-zinc-500 font-bold uppercase leading-tight mt-0.5">{m.label}</p>
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
+
+      {/* ── Main grid ──────────────────────────────────────────── */}
+      <div className="lg:grid lg:grid-cols-[280px_1fr_1fr] min-h-[calc(100vh-57px)] w-full max-w-full overflow-x-hidden">
+        <aside id="tour-groups" className="hidden lg:flex lg:flex-col border-r border-white/5 p-4 space-y-2 overflow-y-auto">
           <div className="flex items-center justify-between mb-3 px-1">
             <h2 className="text-[10px] font-black uppercase tracking-[0.2em] text-zinc-500">{t.groups.title}</h2>
             <button onClick={() => setIsGroupModalOpen(true)}
@@ -436,7 +529,192 @@ export default function Home() {
           )}
         </aside>
 
-        <section id="tour-availability" className="border-r border-white/5 p-4 md:p-6 flex flex-col gap-4">
+        {/* ── Mobile-only single-column layout ── */}
+        <div className="lg:hidden flex flex-col gap-0">
+          {/* My Availability */}
+          <section id="tour-availability" className="p-4 flex flex-col gap-4">
+            <div><h2 className="text-[10px] font-black uppercase tracking-[0.2em] text-zinc-500">{t.availability.title}</h2><p className="text-[10px] text-zinc-700 mt-0.5">{t.availability.subtitle}</p></div>
+            <div className="flex gap-2 overflow-x-auto pb-1 scrollbar-hide">
+              {week.map(day => {
+                const ds = format(day, 'yyyy-MM-dd');
+                const isSel = isSameDay(day, selectedDay);
+                return (
+                  <button key={ds} onClick={() => setSelectedDay(day)}
+                    className={`flex flex-col items-center min-w-[52px] py-3 rounded-2xl transition-all relative ${isSel ? 'bg-white text-black shadow-lg' : 'bg-white/5 text-zinc-400 hover:bg-white/10'}`}>
+                    <span className="text-[9px] font-bold uppercase tracking-tight opacity-60 mb-0.5">{format(day, 'EEE', { locale: language === 'es' ? es : undefined })}</span>
+                    <span className="text-lg font-black leading-none">{format(day, 'd')}</span>
+                    {(mySelection[ds] || []).length > 0 && !isSel && <div className="absolute top-1.5 right-1.5 w-1.5 h-1.5 bg-pink-500 rounded-full" />}
+                  </button>
+                );
+              })}
+            </div>
+            <div className="grid grid-cols-2 gap-3 flex-1">
+              {MOMENTS.map(({ id, label, hours, icon: Icon, color }) => {
+                const isOn = currentMoments.includes(id);
+                return (
+                  <button key={id} onClick={() => toggleMoment(id)}
+                    className={`relative rounded-3xl p-4 text-left transition-all duration-200 ${isOn ? `bg-gradient-to-br ${color} shadow-lg scale-[0.98]` : 'bg-white/5 hover:bg-white/8 border border-white/5'}`}>
+                    <div className={`w-9 h-9 rounded-xl flex items-center justify-center mb-3 ${isOn ? 'bg-white/20' : 'bg-white/5'}`}><Icon size={18} className={isOn ? 'text-white' : 'text-zinc-500'} /></div>
+                    <p className={`font-black text-sm ${isOn ? 'text-white' : 'text-zinc-300'}`}>{label}</p>
+                    <p className={`text-[10px] ${isOn ? 'text-white/60' : 'text-zinc-600'}`}>{hours}</p>
+                    {isOn && <div className="absolute top-3 right-3 w-6 h-6 bg-white rounded-full flex items-center justify-center"><Check size={12} strokeWidth={3} className="text-black" /></div>}
+                  </button>
+                );
+              })}
+            </div>
+            <div className="relative">
+              <MessageSquare size={14} className="absolute left-3.5 top-3.5 text-zinc-600 pointer-events-none" />
+              <input type="text" value={currentNote} onChange={e => setMyNotes(prev => ({ ...prev, [dayStr]: e.target.value }))}
+                placeholder={t.availability.notePlaceholder} maxLength={80}
+                className="w-full bg-white/5 border border-white/8 rounded-2xl pl-9 pr-4 py-3 text-sm text-zinc-200 placeholder-zinc-700 focus:outline-none focus:border-pink-500/50 transition-colors" />
+            </div>
+            <button id="tour-confirm" onClick={saveAvailability} disabled={saving || currentMoments.length === 0}
+              className="w-full py-3.5 premium-gradient text-white font-black rounded-2xl shadow-lg shadow-pink-500/20 hover:scale-[1.01] transition-all disabled:opacity-40 flex items-center justify-center gap-2">
+              {saving ? <Loader2 size={18} className="animate-spin" /> : saved ? <><CheckCircle size={18} /> {t.availability.confirmed}</> : <><Zap size={18} fill="currentColor" /> {t.availability.confirmBtn}</>}
+            </button>
+          </section>
+
+          {/* Divider */}
+          <div className="mx-4 border-t border-white/5" />
+
+          {/* Group Agenda */}
+          <section id="tour-agenda" className="p-4 flex flex-col gap-4">
+            {!selectedGroup ? (
+              <div className="flex-1 flex flex-col items-center justify-center text-center py-12"><Users2 size={28} className="text-zinc-700 mb-3" /><p className="font-bold text-zinc-500">{t.agenda.selectGroup}</p></div>
+            ) : (
+              <>
+                <div>
+                  <p className="text-[10px] font-black text-pink-500 uppercase tracking-[0.2em]">{t.agenda.title}</p>
+                  <div className="flex items-center justify-between"><h2 className="font-black text-xl uppercase italic">{selectedGroup.name}</h2><button onClick={fetchGroupData} className="text-[10px] font-bold text-zinc-700 hover:text-zinc-400 tracking-wider transition-colors">{t.common.refresh}</button></div>
+                </div>
+                {availabilities.length === 0 ? (
+                  <div className="flex-1 flex flex-col items-center justify-center text-center border border-dashed border-white/8 rounded-3xl py-12 gap-3"><Coffee size={32} className="text-zinc-700" /><div><p className="font-bold text-zinc-500 text-sm">{t.agenda.emptyState}</p></div></div>
+                ) : (
+                  <div className="space-y-6">
+                    {Object.entries(availByDay).map(([day, slots]) => {
+                      const isToday = day === format(today, 'yyyy-MM-dd');
+                      return (
+                        <div key={day}>
+                          <div className="flex items-center gap-3 mb-3">
+                            <div className={`rounded-xl px-3 py-1.5 text-center min-w-[48px] ${isToday ? 'bg-pink-500 text-white' : 'bg-white/8 text-zinc-300'}`}>
+                              <p className="text-[9px] font-black uppercase opacity-70 leading-none">{isToday ? 'HOY' : format(parseISO(day), 'EEE', { locale: language === 'es' ? es : undefined }).toUpperCase()}</p>
+                              <p className="text-xl font-black leading-tight">{format(parseISO(day), 'd')}</p>
+                            </div>
+                            <div className="flex-1 border-t border-white/8" />
+                            <div className="flex items-center gap-1.5 bg-white/5 rounded-full px-2.5 py-1 shrink-0"><span className="text-[10px] font-bold text-zinc-400">{slots.length} {slots.length === 1 ? t.agenda.person : t.agenda.pibes}</span></div>
+                          </div>
+                          <div className="space-y-2">
+                            {slots.map((slot: any) => {
+                              const member = groupMembers.find(m => m.id === slot.user_id);
+                              if (!member) return null;
+                              const slotComments = comments[slot.id] || [];
+                              return (
+                                <div key={slot.id} className={`rounded-2xl p-3.5 border-l-[3px] ${member.id === user.id ? 'bg-purple-500/5 border-l-purple-500' : 'bg-white/3 border-l-pink-500/50'}`}>
+                                  <div className="flex items-center gap-2.5">
+                                    <img src={member.avatar_url} className="w-8 h-8 rounded-full border border-white/10" alt="" />
+                                    <div className="flex-1 min-w-0">
+                                      <div className="flex items-center gap-2"><p className="font-bold text-sm">{member.id === user.id ? t.common.me : member.full_name?.split(' ')[0]}</p></div>
+                                      <div className="flex flex-wrap gap-1 mt-1.5">{slot.moments?.map((m: string) => <span key={m} className="text-[10px] px-2 py-0.5 rounded-full font-bold bg-white/5 text-pink-300">{MOMENT_LABEL[m]}</span>)}</div>
+                                    </div>
+                                  </div>
+                                  {slot.note && <div className="mt-2 flex items-start gap-2 bg-white/5 rounded-xl px-3 py-2"><MessageSquare size={11} className="text-zinc-500 mt-0.5" /><p className="text-[11px] text-zinc-300 italic flex-1">"{slot.note}"</p></div>}
+                                  {slotComments.length > 0 && (
+                                    <div className="mt-2 ml-3 space-y-1.5">{slotComments.map((c: any) => (
+                                      <div key={c.id} className="flex items-start gap-2"><CornerDownRight size={12} className="text-zinc-700 mt-1" /><img src={c.profiles?.avatar_url} className="w-5 h-5 rounded-full" alt="" /><div className="flex-1 bg-white/5 rounded-xl px-2.5 py-1.5 text-[11px] text-zinc-300"><span className="font-black text-zinc-500 mr-2 uppercase text-[9px]">{c.profiles?.full_name?.split(' ')[0]}</span>{c.content}</div></div>
+                                    ))}</div>
+                                  )}
+                                  <div className="mt-2 ml-3">
+                                    {replyingTo === slot.id ? (
+                                      <div className="flex gap-2"><input autoFocus type="text" value={replyDraft} onChange={e => setReplyDraft(e.target.value)} onKeyDown={e => e.key === 'Enter' && postReply(slot.id)} className="flex-1 bg-white/5 border border-white/10 rounded-xl px-3 py-1.5 text-xs text-white outline-none" /><button onClick={() => postReply(slot.id)} className="w-7 h-7 bg-pink-500 rounded-full flex items-center justify-center"><Send size={12} className="text-white" /></button></div>
+                                    ) : (
+                                      <button onClick={() => setReplyingTo(slot.id)} className="text-[10px] font-bold text-zinc-600 hover:text-pink-400 flex items-center gap-1.5"><CornerDownRight size={11} /> {t.agenda.reply}</button>
+                                    )}
+                                  </div>
+                                </div>
+                              );
+                            })}
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
+              </>
+            )}
+          </section>
+
+          {/* Divider */}
+          <div className="mx-4 border-t border-white/5" />
+
+          {/* Members */}
+          {selectedGroup && groupMembers.length > 0 && (
+            <section className="px-4 py-4 flex flex-col gap-3">
+              <p className="text-[10px] font-black uppercase tracking-[0.2em] text-zinc-500">{t.groups.members}</p>
+              <div className="space-y-2">
+                {groupMembers.map(m => {
+                  const stats = computeMemberMetrics(m.id, availabilities);
+                  return (
+                    <div key={m.id} className="flex items-center gap-2.5 bg-white/[0.03] rounded-2xl px-3 py-2">
+                      <img src={m.avatar_url} className="w-7 h-7 rounded-full border border-white/10" alt="" />
+                      <div className="flex-1 min-w-0">
+                        <p className="text-[12px] text-zinc-300 font-semibold leading-tight truncate">{m.id === user.id ? t.common.me : m.full_name?.split(' ')[0]}</p>
+                        <p className="text-[10px] text-zinc-600 leading-tight">{stats.totalDays} {stats.totalDays === 1 ? t.agenda.dayThisWeek : t.agenda.daysThisWeek}</p>
+                      </div>
+                      {stats.totalMoments >= 4 && <Flame size={13} className="text-orange-400 shrink-0" />}
+                    </div>
+                  );
+                })}
+              </div>
+            </section>
+          )}
+
+          {/* Ranking */}
+          {groupScores.length > 0 && (
+            <>
+              <div className="mx-4 border-t border-white/5" />
+              <section className="px-4 py-4 flex flex-col gap-3">
+                <div className="flex items-center gap-2">
+                  <Trophy size={14} className="text-yellow-400" />
+                  <p className="text-[10px] font-black uppercase tracking-[0.2em] text-yellow-500/90">Ranking</p>
+                </div>
+                <div className="space-y-1.5">
+                  {groupScores.slice(0, 5).map((s, i) => (
+                    <div key={s.user_id} className={`flex items-center gap-2.5 rounded-2xl px-3 py-2.5 ${s.user_id === user.id ? 'bg-yellow-500/10 border border-yellow-500/20' : 'bg-white/[0.03]'}`}>
+                      <span className="text-sm w-5 flex justify-center shrink-0 font-black">{medal(i)}</span>
+                      <img src={s.profiles?.avatar_url} className="w-6 h-6 rounded-full" alt="" />
+                      <p className="flex-1 text-[12px] font-bold truncate">{s.user_id === user.id ? t.common.me : s.profiles?.full_name?.split(' ')[0]}</p>
+                      <p className="text-xs font-black text-yellow-400">{s.score}</p>
+                    </div>
+                  ))}
+                </div>
+              </section>
+            </>
+          )}
+
+          {/* Group Actions */}
+          {groups.length > 0 && (
+            <>
+              <div className="mx-4 border-t border-white/5" />
+              <section className="px-4 py-4 flex flex-col gap-2">
+                <p className="text-[10px] font-black uppercase tracking-[0.2em] text-zinc-600 mb-1">{t.groups.title}</p>
+                <div className="flex gap-2">
+                  <button onClick={() => setIsGroupModalOpen(true)}
+                    className="flex-1 py-3 border border-white/10 rounded-2xl flex items-center justify-center gap-1.5 text-zinc-500 hover:text-pink-400 hover:border-pink-500/20 transition-all text-xs font-bold">
+                    <Plus size={14} />{t.groups.createFirst}
+                  </button>
+                  <button onClick={() => setIsJoinModalOpen(true)}
+                    className="flex-1 py-3 border border-white/10 rounded-2xl flex items-center justify-center gap-1.5 text-zinc-500 hover:text-purple-400 hover:border-purple-500/20 transition-all text-xs font-bold">
+                    <Users2 size={14} />{t.groups.joinGroupBtn}
+                  </button>
+                </div>
+              </section>
+            </>
+          )}
+          <div className="h-6" />
+        </div>
+
+        {/* ── Desktop layout columns ── */}
+        <section id="tour-availability" className="hidden lg:flex border-r border-white/5 p-4 md:p-6 flex-col gap-4 pb-6">
           <div><h2 className="text-[10px] font-black uppercase tracking-[0.2em] text-zinc-500">{t.availability.title}</h2><p className="text-[10px] text-zinc-700 mt-0.5">{t.availability.subtitle}</p></div>
           <div className="flex gap-2 overflow-x-auto pb-1 scrollbar-hide">
             {week.map(day => {
@@ -472,13 +750,13 @@ export default function Home() {
               placeholder={t.availability.notePlaceholder} maxLength={80}
               className="w-full bg-white/5 border border-white/8 rounded-2xl pl-9 pr-4 py-3 text-sm text-zinc-200 placeholder-zinc-700 focus:outline-none focus:border-pink-500/50 transition-colors" />
           </div>
-          <button id="tour-confirm" onClick={saveAvailability} disabled={saving || currentMoments.length === 0}
+          <button id="tour-confirm-desktop" onClick={saveAvailability} disabled={saving || currentMoments.length === 0}
             className="w-full py-3.5 premium-gradient text-white font-black rounded-2xl shadow-lg shadow-pink-500/20 hover:scale-[1.01] transition-all disabled:opacity-40 flex items-center justify-center gap-2">
             {saving ? <Loader2 size={18} className="animate-spin" /> : saved ? <><CheckCircle size={18} /> {t.availability.confirmed}</> : <><Zap size={18} fill="currentColor" /> {t.availability.confirmBtn}</>}
           </button>
         </section>
 
-        <section id="tour-agenda" className="p-4 md:p-6 flex flex-col gap-4 overflow-y-auto">
+        <section id="tour-agenda" className="hidden lg:flex p-4 md:p-6 flex-col gap-4 overflow-y-auto pb-6">
           {!selectedGroup ? (
             <div className="flex-1 flex flex-col items-center justify-center text-center py-12"><Users2 size={28} className="text-zinc-700 mb-3" /><p className="font-bold text-zinc-500">{t.agenda.selectGroup}</p></div>
           ) : (
