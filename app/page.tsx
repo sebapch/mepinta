@@ -83,6 +83,10 @@ export default function Home() {
   const [newGroupName, setNewGroupName] = useState('');
   const [creatingGroup, setCreatingGroup] = useState(false);
   const [copiedId, setCopiedId] = useState<string | null>(null);
+  const [isJoinModalOpen, setIsJoinModalOpen] = useState(false);
+  const [joinCode, setJoinCode] = useState('');
+  const [joiningGroup, setJoiningGroup] = useState(false);
+  const [joinFeedback, setJoinFeedback] = useState<{ ok: boolean; msg: string } | null>(null);
   const [groupMembers, setGroupMembers] = useState<any[]>([]);
   const [availabilities, setAvailabilities] = useState<any[]>([]);
   const [comments, setComments] = useState<Record<string, any[]>>({});
@@ -212,16 +216,50 @@ export default function Home() {
     setMySelection(prev => { const c = prev[ds] || []; return { ...prev, [ds]: c.includes(id) ? c.filter(m => m !== id) : [...c, id] }; });
   };
 
+  const generateInviteCode = () => {
+    const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
+    return Array.from({ length: 6 }, () => chars[Math.floor(Math.random() * chars.length)]).join('');
+  };
+
   const handleCreateGroup = async (e: React.FormEvent) => {
     e.preventDefault(); setCreatingGroup(true);
     const { data: { user } } = await supabase.auth.getUser(); if (!user) return;
-    const { data: group, error } = await supabase.from('groups').insert({ name: newGroupName, created_by: user.id }).select().single();
+    const invite_code = generateInviteCode();
+    const { data: group, error } = await supabase.from('groups').insert({ name: newGroupName, created_by: user.id, invite_code }).select().single();
     if (!error) {
       await supabase.from('group_members').insert({ group_id: group.id, user_id: user.id });
       setIsGroupModalOpen(false); setNewGroupName('');
       await fetchGroups(); setSelectedGroup(group);
     }
     setCreatingGroup(false);
+  };
+
+  const handleJoinGroup = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!joinCode.trim()) return;
+    setJoiningGroup(true); setJoinFeedback(null);
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) return;
+    const { data: group } = await supabase.from('groups').select('*').eq('invite_code', joinCode.trim().toUpperCase()).single();
+    if (!group) {
+      setJoinFeedback({ ok: false, msg: t.groups.joinError });
+      setJoiningGroup(false); return;
+    }
+    // Check if already a member
+    const { data: existing } = await supabase.from('group_members').select('id').eq('group_id', group.id).eq('user_id', user.id).single();
+    if (existing) {
+      setJoinFeedback({ ok: false, msg: t.groups.joinError });
+      setJoiningGroup(false); return;
+    }
+    const { error } = await supabase.from('group_members').insert({ group_id: group.id, user_id: user.id });
+    if (!error) {
+      setJoinFeedback({ ok: true, msg: t.groups.joinSuccess });
+      await fetchGroups(); setSelectedGroup(group);
+      setTimeout(() => { setIsJoinModalOpen(false); setJoinCode(''); setJoinFeedback(null); }, 1200);
+    } else {
+      setJoinFeedback({ ok: false, msg: t.groups.joinError });
+    }
+    setJoiningGroup(false);
   };
 
   const handleCopyLink = (id: string) => {
@@ -288,10 +326,16 @@ export default function Home() {
               className="w-7 h-7 rounded-full bg-white/5 hover:bg-pink-500/20 hover:text-pink-400 flex items-center justify-center text-zinc-500 transition-colors"><Plus size={14} /></button>
           </div>
           {groups.length === 0 ? (
-            <button onClick={() => setIsGroupModalOpen(true)} className="w-full py-6 border-2 border-dashed border-white/10 rounded-2xl flex flex-col items-center gap-2 hover:border-pink-500/30 hover:bg-pink-500/5 transition-all group">
-              <Plus size={20} className="text-zinc-600 group-hover:text-pink-500 transition-colors" />
-              <span className="text-xs text-zinc-600 group-hover:text-zinc-400 font-bold">{t.groups.createFirst}</span>
-            </button>
+            <div className="flex flex-col gap-2">
+              <button onClick={() => setIsGroupModalOpen(true)} className="w-full py-5 border-2 border-dashed border-white/10 rounded-2xl flex flex-col items-center gap-2 hover:border-pink-500/30 hover:bg-pink-500/5 transition-all group">
+                <Plus size={20} className="text-zinc-600 group-hover:text-pink-500 transition-colors" />
+                <span className="text-xs text-zinc-600 group-hover:text-zinc-400 font-bold">{t.groups.createFirst}</span>
+              </button>
+              <button onClick={() => setIsJoinModalOpen(true)} className="w-full py-3 border border-white/10 rounded-2xl flex items-center justify-center gap-2 hover:border-purple-500/30 hover:bg-purple-500/5 text-zinc-600 hover:text-purple-400 transition-all text-xs font-bold">
+                <Users2 size={14} />
+                {t.groups.joinGroupBtn}
+              </button>
+            </div>
           ) : (
             groups.map(group => {
               const isSelected = selectedGroup?.id === group.id;
@@ -328,8 +372,21 @@ export default function Home() {
                           <p className="text-[10px] text-zinc-400">{t.groups.bestDay}: <span className="font-bold text-pink-300 capitalize">{format(parseISO(groupMetrics.bestDay[0]), "EEEE d/M", { locale: language === 'es' ? es : undefined })}</span></p>
                         </div>
                       )}
+                      {group.invite_code && (
+                        <div className="mt-2.5 bg-white/5 border border-white/8 rounded-xl px-3 py-2">
+                          <p className="text-[9px] font-black uppercase tracking-[0.15em] text-zinc-600 mb-1">{t.groups.groupCode}</p>
+                          <div className="flex items-center justify-between gap-2">
+                            <span className="text-lg font-black tracking-[0.3em] text-pink-300 leading-none">{group.invite_code}</span>
+                            <button onClick={e => { e.stopPropagation(); navigator.clipboard.writeText(group.invite_code); setCopiedId(group.id); setTimeout(() => setCopiedId(null), 2000); }}
+                              className={`text-[10px] font-bold px-2 py-1 rounded-lg transition-all ${copiedId === group.id ? 'bg-green-500/10 text-green-400' : 'bg-white/5 text-zinc-500 hover:text-pink-400 hover:bg-pink-500/10'}`}>
+                              {copiedId === group.id ? '✓' : 'Copiar'}
+                            </button>
+                          </div>
+                          <p className="text-[9px] text-zinc-600 mt-1">{t.groups.groupCodeDesc}</p>
+                        </div>
+                      )}
                       <button onClick={e => { e.stopPropagation(); handleCopyLink(group.id); }}
-                        className={`mt-2.5 w-full py-1.5 rounded-xl text-[11px] font-bold flex items-center justify-center gap-1.5 transition-all border ${copiedId === group.id ? 'bg-green-500/10 text-green-400 border-green-500/20' : 'bg-white/5 text-zinc-400 border-white/5 hover:bg-pink-500/10 hover:text-pink-400 hover:border-pink-500/20'}`}>
+                        className={`mt-2 w-full py-1.5 rounded-xl text-[11px] font-bold flex items-center justify-center gap-1.5 transition-all border ${copiedId === group.id ? 'bg-green-500/10 text-green-400 border-green-500/20' : 'bg-white/5 text-zinc-400 border-white/5 hover:bg-pink-500/10 hover:text-pink-400 hover:border-pink-500/20'}`}>
                         {copiedId === group.id ? <><CheckCircle size={12} /> {t.groups.linkCopied}</> : <><Share2 size={12} /> {t.groups.inviteBtn}</>}
                       </button>
                       <div className="mt-3 pt-3 border-t border-white/8">
@@ -370,6 +427,12 @@ export default function Home() {
                 </div>
               );
             })
+          )}
+          {groups.length > 0 && (
+            <button onClick={() => setIsJoinModalOpen(true)} className="w-full mt-2 py-2.5 border border-white/8 rounded-2xl flex items-center justify-center gap-2 hover:border-purple-500/30 hover:bg-purple-500/5 text-zinc-600 hover:text-purple-400 transition-all text-[11px] font-bold">
+              <Users2 size={13} />
+              {t.groups.joinGroupBtn}
+            </button>
           )}
         </aside>
 
@@ -492,6 +555,40 @@ export default function Home() {
               <form onSubmit={handleCreateGroup} className="space-y-4">
                 <input type="text" autoFocus required value={newGroupName} onChange={e => setNewGroupName(e.target.value)} placeholder={t.groups.groupNamePlaceholder} className="w-full bg-white/5 border border-white/10 rounded-2xl px-4 py-3.5 text-white outline-none focus:border-pink-500 transition-colors" />
                 <button type="submit" disabled={creatingGroup || !newGroupName.trim()} className="w-full py-3.5 premium-gradient text-white font-black rounded-2xl shadow-xl shadow-pink-500/20">{creatingGroup ? t.groups.creating : t.groups.createBtn}</button>
+              </form>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
+
+      <AnimatePresence>
+        {isJoinModalOpen && (
+          <div className="fixed inset-0 z-[100] flex items-center justify-center p-4">
+            <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} onClick={() => { setIsJoinModalOpen(false); setJoinCode(''); setJoinFeedback(null); }} className="absolute inset-0 bg-black/80 backdrop-blur-sm" />
+            <motion.div initial={{ opacity: 0, y: 40 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: 40 }} className="relative w-full max-w-md bg-zinc-900 rounded-3xl p-6 border border-white/10 shadow-2xl">
+              <div className="flex justify-between items-center mb-5">
+                <div>
+                  <h2 className="text-xl font-black italic">{t.groups.joinByCode} 🔑</h2>
+                  <p className="text-zinc-500 text-xs mt-0.5">{t.groups.groupCodeDesc}</p>
+                </div>
+                <button onClick={() => { setIsJoinModalOpen(false); setJoinCode(''); setJoinFeedback(null); }}><X size={20} className="text-zinc-500" /></button>
+              </div>
+              <form onSubmit={handleJoinGroup} className="space-y-4">
+                <input
+                  type="text" autoFocus required
+                  value={joinCode}
+                  onChange={e => { setJoinCode(e.target.value.toUpperCase().slice(0, 6)); setJoinFeedback(null); }}
+                  placeholder={t.groups.joinCodePlaceholder}
+                  maxLength={6}
+                  className="w-full bg-white/5 border border-white/10 rounded-2xl px-4 py-3.5 text-white outline-none focus:border-purple-500 transition-colors text-center text-2xl font-black tracking-[0.4em] uppercase"
+                />
+                {joinFeedback && (
+                  <p className={`text-center text-sm font-bold ${joinFeedback.ok ? 'text-green-400' : 'text-red-400'}`}>{joinFeedback.msg}</p>
+                )}
+                <button type="submit" disabled={joiningGroup || joinCode.length !== 6}
+                  className="w-full py-3.5 bg-gradient-to-r from-purple-600 to-violet-700 text-white font-black rounded-2xl shadow-xl shadow-purple-500/20 disabled:opacity-40 flex items-center justify-center gap-2">
+                  {joiningGroup ? <><Loader2 size={18} className="animate-spin" /> {t.groups.joining}</> : <><Users2 size={18} /> {t.groups.joinCodeBtn}</>}
+                </button>
               </form>
             </motion.div>
           </div>
