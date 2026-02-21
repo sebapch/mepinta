@@ -5,7 +5,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import {
   Users2, Plus, Share2, CheckCircle, LogOut, Zap,
   Coffee, Sun, Sunset, Moon, Check, Loader2, X,
-  MessageSquare, Flame, CalendarCheck, Send, CornerDownRight, Trophy, Gamepad2
+  MessageSquare, Flame, CalendarCheck, Send, CornerDownRight, Trophy, Gamepad2, HelpCircle
 } from 'lucide-react';
 import { format, addDays, startOfToday, eachDayOfInterval, isSameDay, parseISO } from 'date-fns';
 import { es } from 'date-fns/locale';
@@ -13,6 +13,7 @@ import { supabase } from '../lib/supabase';
 import { useRouter } from 'next/navigation';
 import FlappyBird from '../components/FlappyBird';
 import { useLanguage } from '../components/LanguageContext';
+import OnboardingTour from '../components/OnboardingTour';
 
 // ── Helpers ────────────────────────────────────────────────────────
 function computeGroupMetrics(availabilities: any[], groupMembers: any[], t: any) {
@@ -96,6 +97,7 @@ export default function Home() {
   const [isGameOpen, setIsGameOpen] = useState(false);
   const [groupScores, setGroupScores] = useState<any[]>([]);
   const [myBest, setMyBest] = useState(0);
+  const [hasSeenTour, setHasSeenTour] = useState(true); // Default to true to prevent flash
 
   useEffect(() => {
     supabase.auth.getSession().then(({ data: { session } }) => {
@@ -119,6 +121,10 @@ export default function Home() {
     const fetched = data || [];
     setGroups(fetched);
     if (fetched.length > 0 && !selectedGroup) setSelectedGroup(fetched[0]);
+
+    // Check if user has seen tour
+    const { data: profile } = await supabase.from('profiles').select('has_seen_tour').eq('id', user.id).single();
+    setHasSeenTour(profile?.has_seen_tour ?? false);
   };
 
   useEffect(() => { if (selectedGroup) fetchGroupData(); }, [selectedGroup]);
@@ -243,16 +249,21 @@ export default function Home() {
 
   return (
     <div className="min-h-screen bg-[#0a0a0a]">
-      <header className="sticky top-0 z-50 backdrop-blur-xl bg-black/60 border-b border-white/5 px-4 md:px-8 py-3 flex items-center justify-between">
+      <OnboardingTour userId={session?.user?.id} hasSeenTour={hasSeenTour} onTourComplete={() => setHasSeenTour(true)} />
+      <header id="tour-header" className="sticky top-0 z-50 backdrop-blur-xl bg-black/60 border-b border-white/5 px-4 md:px-8 py-3 flex items-center justify-between">
         <h1 className="text-2xl font-black italic bg-gradient-to-r from-pink-500 to-purple-500 bg-clip-text text-transparent tracking-tight">
           {t.common.appName}
         </h1>
         <div className="flex items-center gap-2">
+          <button onClick={() => (window as any).startMepintaTour?.()}
+            className="p-2 rounded-full bg-white/5 hover:bg-white/10 text-zinc-400 transition-all" title={language === 'es' ? 'Ayuda' : 'Help'}>
+            <HelpCircle size={18} />
+          </button>
           <button onClick={() => setLanguage(language === 'es' ? 'en' : 'es')}
             className="flex items-center gap-2 bg-white/5 hover:bg-white/10 border border-white/10 text-zinc-400 font-bold text-xs rounded-full px-3 py-1.5 transition-all">
             {language === 'es' ? 'EN' : 'ES'}
           </button>
-          <button onClick={() => setIsGameOpen(true)}
+          <button id="tour-game" onClick={() => setIsGameOpen(true)}
             className="flex items-center gap-2 bg-purple-500/15 hover:bg-purple-500/25 border border-purple-500/20 text-purple-300 hover:text-purple-200 font-bold text-sm rounded-full px-3.5 py-1.5 transition-all">
             <Gamepad2 size={15} />
             <span className="hidden sm:inline">{t.game.playBtn}</span>
@@ -270,7 +281,7 @@ export default function Home() {
       </header>
 
       <div className="grid grid-cols-1 lg:grid-cols-[280px_1fr_1fr] min-h-[calc(100vh-57px)]">
-        <aside className="border-r border-white/5 p-4 space-y-2 overflow-y-auto">
+        <aside id="tour-groups" className="border-r border-white/5 p-4 space-y-2 overflow-y-auto">
           <div className="flex items-center justify-between mb-3 px-1">
             <h2 className="text-[10px] font-black uppercase tracking-[0.2em] text-zinc-500">{t.groups.title}</h2>
             <button onClick={() => setIsGroupModalOpen(true)}
@@ -362,7 +373,7 @@ export default function Home() {
           )}
         </aside>
 
-        <section className="border-r border-white/5 p-4 md:p-6 flex flex-col gap-4">
+        <section id="tour-availability" className="border-r border-white/5 p-4 md:p-6 flex flex-col gap-4">
           <div><h2 className="text-[10px] font-black uppercase tracking-[0.2em] text-zinc-500">{t.availability.title}</h2><p className="text-[10px] text-zinc-700 mt-0.5">{t.availability.subtitle}</p></div>
           <div className="flex gap-2 overflow-x-auto pb-1 scrollbar-hide">
             {week.map(day => {
@@ -398,13 +409,13 @@ export default function Home() {
               placeholder={t.availability.notePlaceholder} maxLength={80}
               className="w-full bg-white/5 border border-white/8 rounded-2xl pl-9 pr-4 py-3 text-sm text-zinc-200 placeholder-zinc-700 focus:outline-none focus:border-pink-500/50 transition-colors" />
           </div>
-          <button onClick={saveAvailability} disabled={saving || currentMoments.length === 0}
+          <button id="tour-confirm" onClick={saveAvailability} disabled={saving || currentMoments.length === 0}
             className="w-full py-3.5 premium-gradient text-white font-black rounded-2xl shadow-lg shadow-pink-500/20 hover:scale-[1.01] transition-all disabled:opacity-40 flex items-center justify-center gap-2">
             {saving ? <Loader2 size={18} className="animate-spin" /> : saved ? <><CheckCircle size={18} /> {t.availability.confirmed}</> : <><Zap size={18} fill="currentColor" /> {t.availability.confirmBtn}</>}
           </button>
         </section>
 
-        <section className="p-4 md:p-6 flex flex-col gap-4 overflow-y-auto">
+        <section id="tour-agenda" className="p-4 md:p-6 flex flex-col gap-4 overflow-y-auto">
           {!selectedGroup ? (
             <div className="flex-1 flex flex-col items-center justify-center text-center py-12"><Users2 size={28} className="text-zinc-700 mb-3" /><p className="font-bold text-zinc-500">{t.agenda.selectGroup}</p></div>
           ) : (
