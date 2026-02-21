@@ -1,8 +1,9 @@
 'use client';
 
-import { useEffect, useRef, useState, useCallback } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { X, Trophy, RotateCcw, Zap } from 'lucide-react';
+import { X, Trophy, RotateCcw, Loader2 } from 'lucide-react';
+import { useRef, useEffect, useState, useCallback } from 'react';
+import { useLanguage } from '../components/LanguageContext';
 
 interface Props {
     onClose: () => void;
@@ -13,22 +14,23 @@ interface Props {
 const W = 360;
 const H = 560;
 const BIRD_X = 70;
-const BIRD_R = 16;
+const BIRD_R = 14; // Slightly smaller hit circle for "fairness"
 const GRAVITY = 0.45;
-const JUMP = -8.5;
-const PIPE_W = 52;
-const PIPE_GAP = 145;
-const PIPE_SPEED = 2.8;
-const PIPE_INTERVAL = 100; // frames
+const JUMP = -8.2;
+const PIPE_W = 56;
+const PIPE_GAP = 160; // Slightly larger gap to be less frustrating
+const PIPE_SPEED = 3.0;
+const PIPE_INTERVAL = 95;
 
 type GameState = 'idle' | 'playing' | 'dead';
 
 export default function FlappyBird({ onClose, onGameOver, personalBest }: Props) {
+    const { t } = useLanguage();
     const canvasRef = useRef<HTMLCanvasElement>(null);
     const stateRef = useRef<{
         gameState: GameState;
         bird: { y: number; vy: number };
-        pipes: { x: number; gapY: number }[];
+        pipes: { x: number; gapY: number; passed?: boolean }[];
         score: number;
         frame: number;
         particles: { x: number; y: number; vx: number; vy: number; life: number; color: string }[];
@@ -75,7 +77,7 @@ export default function FlappyBird({ onClose, onGameOver, personalBest }: Props)
         setGameState('idle');
         setFinalScore(0);
         setSaving(false);
-        setGameKey(k => k + 1); // re-triggers useEffect → fresh game loop
+        setGameKey(k => k + 1);
     }, []);
 
     const jump = useCallback(() => {
@@ -99,14 +101,12 @@ export default function FlappyBird({ onClose, onGameOver, personalBest }: Props)
             const s = stateRef.current;
             ctx.clearRect(0, 0, W, H);
 
-            // Sky gradient
             const sky = ctx.createLinearGradient(0, 0, 0, H);
             sky.addColorStop(0, '#0a0a1a');
             sky.addColorStop(1, '#1a0a2e');
             ctx.fillStyle = sky;
             ctx.fillRect(0, 0, W, H);
 
-            // Stars (static)
             ctx.fillStyle = 'rgba(255,255,255,0.4)';
             const starSeeds = [23, 67, 112, 198, 245, 310, 87, 155, 290, 40];
             starSeeds.forEach((seed, i) => {
@@ -118,42 +118,35 @@ export default function FlappyBird({ onClose, onGameOver, personalBest }: Props)
                 ctx.fill();
             });
 
-            // Pipes
             s.pipes.forEach(pipe => {
                 const topH = pipe.gapY - PIPE_GAP / 2;
                 const botY = pipe.gapY + PIPE_GAP / 2;
                 const botH = H - botY;
 
-                // Pipe body gradient
                 const pg = ctx.createLinearGradient(pipe.x, 0, pipe.x + PIPE_W, 0);
                 pg.addColorStop(0, '#a855f7');
                 pg.addColorStop(0.5, '#d946ef');
                 pg.addColorStop(1, '#7c3aed');
 
                 ctx.fillStyle = pg;
-                // Top pipe
                 ctx.beginPath();
                 ctx.roundRect(pipe.x, 0, PIPE_W, topH - 12, [0, 0, 8, 8]);
                 ctx.fill();
-                // Top cap
                 ctx.fillStyle = '#c026d3';
                 ctx.beginPath();
                 ctx.roundRect(pipe.x - 4, topH - 20, PIPE_W + 8, 20, 6);
                 ctx.fill();
 
-                // Bottom pipe
                 ctx.fillStyle = pg;
                 ctx.beginPath();
                 ctx.roundRect(pipe.x, botY + 12, PIPE_W, botH, [8, 8, 0, 0]);
                 ctx.fill();
-                // Bottom cap
                 ctx.fillStyle = '#c026d3';
                 ctx.beginPath();
                 ctx.roundRect(pipe.x - 4, botY, PIPE_W + 8, 20, 6);
                 ctx.fill();
             });
 
-            // Bird
             const bx = BIRD_X;
             const by = s.bird.y;
             const tilt = Math.max(-0.5, Math.min(0.8, s.bird.vy / 12));
@@ -162,7 +155,6 @@ export default function FlappyBird({ onClose, onGameOver, personalBest }: Props)
             ctx.translate(bx, by);
             ctx.rotate(tilt);
 
-            // Glow
             if (s.gameState === 'playing') {
                 const glow = ctx.createRadialGradient(0, 0, 4, 0, 0, BIRD_R + 10);
                 glow.addColorStop(0, 'rgba(249,115,22,0.4)');
@@ -173,7 +165,6 @@ export default function FlappyBird({ onClose, onGameOver, personalBest }: Props)
                 ctx.fill();
             }
 
-            // Body
             const bodyG = ctx.createRadialGradient(-4, -4, 2, 0, 0, BIRD_R);
             bodyG.addColorStop(0, '#fb923c');
             bodyG.addColorStop(0.6, '#f97316');
@@ -183,13 +174,11 @@ export default function FlappyBird({ onClose, onGameOver, personalBest }: Props)
             ctx.arc(0, 0, BIRD_R, 0, Math.PI * 2);
             ctx.fill();
 
-            // Wing
             ctx.fillStyle = '#fed7aa';
             ctx.beginPath();
             ctx.ellipse(-6, 4 + Math.sin(s.frame * 0.3) * 3, 8, 5, -0.3, 0, Math.PI * 2);
             ctx.fill();
 
-            // Eye
             ctx.fillStyle = 'white';
             ctx.beginPath();
             ctx.arc(7, -5, 5, 0, Math.PI * 2);
@@ -203,7 +192,6 @@ export default function FlappyBird({ onClose, onGameOver, personalBest }: Props)
             ctx.arc(9, -5, 1, 0, Math.PI * 2);
             ctx.fill();
 
-            // Beak
             ctx.fillStyle = '#fbbf24';
             ctx.beginPath();
             ctx.moveTo(14, -2);
@@ -214,7 +202,6 @@ export default function FlappyBird({ onClose, onGameOver, personalBest }: Props)
 
             ctx.restore();
 
-            // Particles
             s.particles.forEach(p => {
                 ctx.globalAlpha = p.life;
                 ctx.fillStyle = p.color;
@@ -224,7 +211,6 @@ export default function FlappyBird({ onClose, onGameOver, personalBest }: Props)
             });
             ctx.globalAlpha = 1;
 
-            // Score HUD
             if (s.gameState === 'playing' || s.gameState === 'dead') {
                 ctx.font = 'bold 36px system-ui';
                 ctx.textAlign = 'center';
@@ -235,17 +221,16 @@ export default function FlappyBird({ onClose, onGameOver, personalBest }: Props)
                 ctx.shadowBlur = 0;
             }
 
-            // Idle overlay
             if (s.gameState === 'idle') {
                 ctx.fillStyle = 'rgba(0,0,0,0.45)';
                 ctx.fillRect(0, 0, W, H);
                 ctx.font = 'bold 24px system-ui';
                 ctx.textAlign = 'center';
                 ctx.fillStyle = 'white';
-                ctx.fillText('🐦 Tap para volar', W / 2, H / 2 - 16);
+                ctx.fillText(`🐦 ${t.game.tapToFly}`, W / 2, H / 2 - 16);
                 ctx.font = '14px system-ui';
                 ctx.fillStyle = 'rgba(255,255,255,0.5)';
-                ctx.fillText('Espacio o toca la pantalla', W / 2, H / 2 + 16);
+                ctx.fillText(t.game.instructions.split('·')[0], W / 2, H / 2 + 16);
             }
         };
 
@@ -254,22 +239,18 @@ export default function FlappyBird({ onClose, onGameOver, personalBest }: Props)
 
             if (s.gameState === 'playing') {
                 s.frame++;
-
-                // Bird physics
                 s.bird.vy += GRAVITY;
                 s.bird.y += s.bird.vy;
 
-                // Spawn pipes
                 if (s.frame % PIPE_INTERVAL === 0) {
                     const gapY = 150 + Math.random() * (H - 300);
                     s.pipes.push({ x: W + 10, gapY });
                 }
 
-                // Move pipes + score
                 s.pipes.forEach(pipe => {
                     pipe.x -= PIPE_SPEED;
-                    if (pipe.x + PIPE_W === BIRD_X - 1 || (pipe.x + PIPE_W < BIRD_X && !('passed' in pipe))) {
-                        (pipe as any).passed = true;
+                    if (!pipe.passed && pipe.x + PIPE_W < BIRD_X) {
+                        pipe.passed = true;
                         s.score++;
                         setDisplayScore(s.score);
                         spawnParticles(BIRD_X + 20, s.bird.y);
@@ -277,7 +258,6 @@ export default function FlappyBird({ onClose, onGameOver, personalBest }: Props)
                 });
                 s.pipes = s.pipes.filter(p => p.x > -PIPE_W - 10);
 
-                // Update particles
                 s.particles.forEach(p => {
                     p.x += p.vx;
                     p.y += p.vy;
@@ -286,13 +266,11 @@ export default function FlappyBird({ onClose, onGameOver, personalBest }: Props)
                 });
                 s.particles = s.particles.filter(p => p.life > 0);
 
-                // Collision: floor / ceiling
                 if (s.bird.y + BIRD_R > H || s.bird.y - BIRD_R < 0) {
                     die();
                     return;
                 }
 
-                // Collision: pipes
                 for (const pipe of s.pipes) {
                     const birdInX = BIRD_X + BIRD_R > pipe.x && BIRD_X - BIRD_R < pipe.x + PIPE_W;
                     const topEnd = pipe.gapY - PIPE_GAP / 2;
@@ -310,6 +288,7 @@ export default function FlappyBird({ onClose, onGameOver, personalBest }: Props)
 
         const die = async () => {
             const s = stateRef.current;
+            if (s.gameState === 'dead') return;
             s.gameState = 'dead';
             setGameState('dead');
             setFinalScore(s.score);
@@ -323,9 +302,7 @@ export default function FlappyBird({ onClose, onGameOver, personalBest }: Props)
 
         animRef.current = requestAnimationFrame(tick);
         return () => { if (animRef.current) cancelAnimationFrame(animRef.current); };
-        // gameKey intentionally restarts the loop on reset
-        // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [onGameOver, gameKey]);
+    }, [onGameOver, gameKey, t]);
 
     useEffect(() => {
         const onKey = (e: KeyboardEvent) => {
@@ -349,24 +326,22 @@ export default function FlappyBird({ onClose, onGameOver, personalBest }: Props)
                 exit={{ opacity: 0, scale: 0.9, y: 20 }}
                 className="relative flex flex-col items-center gap-4"
             >
-                {/* Header */}
                 <div className="flex items-center justify-between w-full px-1">
                     <div className="flex items-center gap-2">
                         <span className="text-2xl">🐦</span>
-                        <span className="font-black text-white text-lg italic">FLAPPY PINTA</span>
+                        <span className="font-black text-white text-lg italic uppercase tracking-tight">FLAPPY PINTA</span>
                     </div>
                     <div className="flex items-center gap-3">
                         <div className="flex items-center gap-1.5 bg-yellow-500/15 rounded-full px-3 py-1">
                             <Trophy size={13} className="text-yellow-400" />
-                            <span className="text-[11px] font-black text-yellow-400">Récord: {personalBest}</span>
+                            <span className="text-[11px] font-black text-yellow-400">{t.game.personalBest}: {personalBest}</span>
                         </div>
                         <button onClick={onClose} className="p-2 rounded-full bg-white/10 hover:bg-white/20 transition-colors">
-                            <X size={18} />
+                            <X size={18} className="text-white" />
                         </button>
                     </div>
                 </div>
 
-                {/* Canvas */}
                 <div className="relative">
                     <canvas
                         ref={canvasRef}
@@ -378,34 +353,41 @@ export default function FlappyBird({ onClose, onGameOver, personalBest }: Props)
                         onTouchStart={e => { e.preventDefault(); jump(); }}
                     />
 
-                    {/* Game Over overlay */}
                     <AnimatePresence>
                         {gameState === 'dead' && (
                             <motion.div
                                 initial={{ opacity: 0, scale: 0.85 }}
                                 animate={{ opacity: 1, scale: 1 }}
-                                className="absolute inset-0 flex flex-col items-center justify-center rounded-3xl bg-black/70 backdrop-blur-sm"
+                                className="absolute inset-0 flex flex-col items-center justify-center rounded-3xl bg-black/70 backdrop-blur-sm p-8 text-center"
                             >
-                                <p className="text-5xl mb-3">💀</p>
-                                <p className="text-3xl font-black text-white mb-1">{finalScore}</p>
-                                <p className="text-zinc-400 text-sm mb-1">
-                                    {finalScore > personalBest ? '🎉 ¡Nuevo récord!' : `Récord: ${personalBest}`}
+                                <p className="text-5xl mb-4">💀</p>
+                                <h2 className="text-2xl font-black text-white mb-1 uppercase tracking-tighter">{t.game.gameOver}</h2>
+                                <p className="text-6xl font-black text-pink-500 mb-2">{finalScore}</p>
+                                <p className="text-zinc-400 text-sm font-bold">
+                                    {finalScore > personalBest ? t.game.newRecord : `${t.game.personalBest}: ${personalBest}`}
                                 </p>
-                                {saving && <p className="text-[11px] text-zinc-500 mb-4">Guardando puntaje...</p>}
-                                {!saving && (
-                                    <button
-                                        onClick={reset}
-                                        className="mt-4 flex items-center gap-2 bg-pink-500 hover:bg-pink-400 text-white font-black px-6 py-3 rounded-2xl transition-colors shadow-lg shadow-pink-500/30"
-                                    >
-                                        <RotateCcw size={16} /> Otra vez
-                                    </button>
-                                )}
+
+                                <div className="mt-8 space-y-3 w-full max-w-[200px]">
+                                    {saving ? (
+                                        <div className="flex flex-col items-center gap-2 text-zinc-500">
+                                            <Loader2 size={24} className="animate-spin" />
+                                            <span className="text-[10px] font-bold uppercase tracking-widest">{t.game.savingScore}</span>
+                                        </div>
+                                    ) : (
+                                        <button
+                                            onClick={reset}
+                                            className="w-full flex items-center justify-center gap-2 bg-white text-black font-black px-6 py-4 rounded-2xl transition-all hover:scale-[1.05] active:scale-[0.95] shadow-xl"
+                                        >
+                                            <RotateCcw size={18} /> {t.game.tryAgain}
+                                        </button>
+                                    )}
+                                </div>
                             </motion.div>
                         )}
                     </AnimatePresence>
                 </div>
 
-                <p className="text-[11px] text-zinc-600">Espacio / tap para saltar · Esc para salir</p>
+                <p className="text-[11px] text-zinc-600 font-bold uppercase tracking-widest">{t.game.instructions}</p>
             </motion.div>
         </div>
     );

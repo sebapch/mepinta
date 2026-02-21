@@ -17,17 +17,21 @@ export const metadata: Metadata = {
   description: "La agenda social para encontrarte con tus amigos al aire libre.",
 };
 
+import { LanguageProvider } from "@/components/LanguageContext";
+
 export default function RootLayout({
   children,
 }: Readonly<{
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="en">
+    <html lang="es">
       <body
         className={`${geistSans.variable} ${geistMono.variable} antialiased`}
       >
-        {children}
+        <LanguageProvider>
+          {children}
+        </LanguageProvider>
       </body>
     </html>
   );

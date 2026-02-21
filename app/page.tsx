@@ -12,21 +12,13 @@ import { es } from 'date-fns/locale';
 import { supabase } from '../lib/supabase';
 import { useRouter } from 'next/navigation';
 import FlappyBird from '../components/FlappyBird';
+import { useLanguage } from '../components/LanguageContext';
 
 // ── Constants ──────────────────────────────────────────────────────
-const MOMENTS = [
-  { id: 'morning', label: 'Mañana', hours: '08–12', icon: Coffee, color: 'from-orange-400 to-amber-500' },
-  { id: 'afternoon', label: 'Tarde', hours: '12–19', icon: Sun, color: 'from-pink-500 to-rose-500' },
-  { id: 'evening', label: 'Noche', hours: '19–00', icon: Sunset, color: 'from-purple-600 to-violet-700' },
-  { id: 'latenight', label: 'Madrugada', hours: '00–04', icon: Moon, color: 'from-slate-600 to-zinc-800' },
-];
-
-const MOMENT_LABEL: Record<string, string> = {
-  morning: '🌅 Mañana', afternoon: '☀️ Tarde', evening: '🌙 Noche', latenight: '🌃 Madrugada',
-};
+// ── Constants will be handled inside the component or via helpers to support i18n
 
 // ── Helpers ────────────────────────────────────────────────────────
-function computeGroupMetrics(availabilities: any[], groupMembers: any[]) {
+function computeGroupMetrics(availabilities: any[], groupMembers: any[], t: any) {
   const totalMembers = groupMembers.length;
   if (totalMembers === 0) return null;
   const membersWithPinta = new Set(availabilities.map(a => a.user_id)).size;
@@ -38,11 +30,13 @@ function computeGroupMetrics(availabilities: any[], groupMembers: any[]) {
   });
   const bestDay = Object.entries(dayCount).sort((a, b) => b[1].size - a[1].size)[0];
   const totalSlots = availabilities.reduce((sum, a) => sum + (a.moments?.length || 0), 0);
-  let activityLabel = '😴 Sin actividad'; let activityColor = 'text-zinc-500';
-  if (pintaPercent >= 75) { activityLabel = '🔥 Todos tienen pinta'; activityColor = 'text-orange-400'; }
-  else if (pintaPercent >= 50) { activityLabel = '⚡ Mucha pinta'; activityColor = 'text-pink-400'; }
-  else if (pintaPercent >= 25) { activityLabel = '✨ Algo está cocinando'; activityColor = 'text-purple-400'; }
-  else if (membersWithPinta > 0) { activityLabel = '🌱 Arrancando'; activityColor = 'text-blue-400'; }
+
+  let activityLabel = t.groups.noActivity; let activityColor = 'text-zinc-500';
+  if (pintaPercent >= 75) { activityLabel = t.groups.highActivity; activityColor = 'text-orange-400'; }
+  else if (pintaPercent >= 50) { activityLabel = t.groups.mediumActivity; activityColor = 'text-pink-400'; }
+  else if (pintaPercent >= 25) { activityLabel = t.groups.lowActivity; activityColor = 'text-purple-400'; }
+  else if (membersWithPinta > 0) { activityLabel = t.groups.startingActivity; activityColor = 'text-blue-400'; }
+
   return { membersWithPinta, totalMembers, pintaPercent, bestDay, totalSlots, activityLabel, activityColor };
 }
 
@@ -61,7 +55,26 @@ function medal(rank: number) {
 
 // ── Main Page ──────────────────────────────────────────────────────
 export default function Home() {
+  const { t, language, setLanguage } = useLanguage();
   const router = useRouter();
+
+  const MOMENTS = [
+    { id: 'morning', label: t.availability.moments.morning, hours: '08–12', icon: Coffee, color: 'from-orange-400 to-amber-500' },
+    { id: 'afternoon', label: t.availability.moments.afternoon, hours: '12–19', icon: Sun, color: 'from-pink-500 to-rose-500' },
+    { id: 'evening', label: t.availability.moments.evening, hours: '19–00', icon: Sunset, color: 'from-purple-600 to-violet-700' },
+    { id: 'latenight', label: t.availability.moments.latenight, hours: '00–04', icon: Moon, color: 'from-slate-600 to-zinc-800' },
+  ];
+
+  const MOMERNT_ICONS: Record<string, string> = {
+    morning: '🌅', afternoon: '☀️', evening: '🌙', latenight: '🌃',
+  };
+
+  const MOMENT_LABEL: Record<string, string> = {
+    morning: `${MOMERNT_ICONS.morning} ${t.availability.moments.morning}`,
+    afternoon: `${MOMERNT_ICONS.afternoon} ${t.availability.moments.afternoon}`,
+    evening: `${MOMERNT_ICONS.evening} ${t.availability.moments.evening}`,
+    latenight: `${MOMERNT_ICONS.latenight} ${t.availability.moments.latenight}`,
+  };
   const today = startOfToday();
   const week = eachDayOfInterval({ start: today, end: addDays(today, 6) });
 
@@ -236,7 +249,7 @@ export default function Home() {
   const dayStr = format(selectedDay, 'yyyy-MM-dd');
   const currentMoments = mySelection[dayStr] || [];
   const currentNote = myNotes[dayStr] || '';
-  const groupMetrics = useMemo(() => computeGroupMetrics(availabilities, groupMembers), [availabilities, groupMembers]);
+  const groupMetrics = useMemo(() => computeGroupMetrics(availabilities, groupMembers, t), [availabilities, groupMembers, t]);
   const availByDay = useMemo(() => {
     const map: Record<string, any[]> = {};
     availabilities.forEach(slot => { if (!map[slot.day]) map[slot.day] = []; map[slot.day].push(slot); });
@@ -257,16 +270,24 @@ export default function Home() {
       {/* ── HEADER */}
       <header className="sticky top-0 z-50 backdrop-blur-xl bg-black/60 border-b border-white/5 px-4 md:px-8 py-3 flex items-center justify-between">
         <h1 className="text-2xl font-black italic bg-gradient-to-r from-pink-500 to-purple-500 bg-clip-text text-transparent tracking-tight">
-          MePinta
+          {t.common.appName}
         </h1>
         <div className="flex items-center gap-2">
+          {/* Language Switcher */}
+          <button
+            onClick={() => setLanguage(language === 'es' ? 'en' : 'es')}
+            className="flex items-center gap-2 bg-white/5 hover:bg-white/10 border border-white/10 text-zinc-400 font-bold text-xs rounded-full px-3 py-1.5 transition-all"
+          >
+            {language === 'es' ? 'EN' : 'ES'}
+          </button>
+
           {/* Jugar button */}
           <button
             onClick={() => setIsGameOpen(true)}
             className="flex items-center gap-2 bg-purple-500/15 hover:bg-purple-500/25 border border-purple-500/20 text-purple-300 hover:text-purple-200 font-bold text-sm rounded-full px-3.5 py-1.5 transition-all"
           >
             <Gamepad2 size={15} />
-            <span className="hidden sm:inline">Jugar</span>
+            <span className="hidden sm:inline">{t.game.playBtn}</span>
             {myBest > 0 && <span className="text-[10px] bg-purple-500/20 rounded-full px-1.5 font-black">{myBest}</span>}
           </button>
 
@@ -282,6 +303,7 @@ export default function Home() {
           <button
             onClick={() => supabase.auth.signOut().then(() => router.push('/login'))}
             className="p-2 rounded-full bg-white/5 hover:bg-red-500/10 text-zinc-500 hover:text-red-400 transition-colors"
+            title={t.auth.logout}
           >
             <LogOut size={16} />
           </button>
@@ -294,7 +316,7 @@ export default function Home() {
         {/* ══ COL 1: GRUPOS */}
         <aside className="border-r border-white/5 p-4 space-y-2 overflow-y-auto">
           <div className="flex items-center justify-between mb-3 px-1">
-            <h2 className="text-[10px] font-black uppercase tracking-[0.2em] text-zinc-500">Mis Grupos</h2>
+            <h2 className="text-[10px] font-black uppercase tracking-[0.2em] text-zinc-500">{t.groups.title}</h2>
             <button onClick={() => setIsGroupModalOpen(true)}
               className="w-7 h-7 rounded-full bg-white/5 hover:bg-pink-500/20 hover:text-pink-400 flex items-center justify-center text-zinc-500 transition-colors">
               <Plus size={14} />
@@ -305,7 +327,7 @@ export default function Home() {
             <button onClick={() => setIsGroupModalOpen(true)}
               className="w-full py-6 border-2 border-dashed border-white/10 rounded-2xl flex flex-col items-center gap-2 hover:border-pink-500/30 hover:bg-pink-500/5 transition-all group">
               <Plus size={20} className="text-zinc-600 group-hover:text-pink-500 transition-colors" />
-              <span className="text-xs text-zinc-600 group-hover:text-zinc-400 font-bold">Crear primer grupo</span>
+              <span className="text-xs text-zinc-600 group-hover:text-zinc-400 font-bold">{t.groups.createFirst}</span>
             </button>
           ) : (
             groups.map(group => {
@@ -321,7 +343,7 @@ export default function Home() {
                       <p className={`font-bold text-sm truncate ${isSelected ? 'text-white' : 'text-zinc-300'}`}>{group.name}</p>
                       {isSelected && groupMetrics
                         ? <p className={`text-[10px] font-bold ${groupMetrics.activityColor}`}>{groupMetrics.activityLabel}</p>
-                        : <p className="text-[10px] text-zinc-600 font-medium">Grupo privado</p>}
+                        : <p className="text-[10px] text-zinc-600 font-medium">{t.groups.private}</p>}
                     </div>
                     {isSelected && <div className="w-2 h-2 rounded-full bg-pink-500 animate-pulse shrink-0" />}
                   </div>
@@ -333,9 +355,9 @@ export default function Home() {
                         <>
                           <div className="mt-3 grid grid-cols-3 gap-1.5">
                             {[
-                              { val: `${groupMetrics.pintaPercent}%`, label: 'Tienen pinta' },
-                              { val: groupMetrics.totalSlots, label: 'Momentos' },
-                              { val: `${groupMetrics.membersWithPinta}/${groupMetrics.totalMembers}`, label: 'Activos' },
+                              { val: `${groupMetrics.pintaPercent}%`, label: t.groups.availabilityLabel },
+                              { val: groupMetrics.totalSlots, label: t.groups.timeSlots },
+                              { val: `${groupMetrics.membersWithPinta}/${groupMetrics.totalMembers}`, label: t.groups.activeMembers },
                             ].map(({ val, label }) => (
                               <div key={label} className="bg-white/5 rounded-xl p-2 text-center">
                                 <p className="text-base font-black text-white">{val}</p>
@@ -347,11 +369,11 @@ export default function Home() {
                             <div className="mt-2 flex items-center gap-1.5 bg-pink-500/5 rounded-xl px-2.5 py-1.5">
                               <CalendarCheck size={11} className="text-pink-400 shrink-0" />
                               <p className="text-[10px] text-zinc-400">
-                                Mejor día:{' '}
+                                {t.groups.bestDay}:{' '}
                                 <span className="font-bold text-pink-300 capitalize">
-                                  {format(parseISO(groupMetrics.bestDay[0]), "EEEE d/M", { locale: es })}
+                                  {format(parseISO(groupMetrics.bestDay[0]), "EEEE d/M", { locale: language === 'es' ? es : undefined })}
                                 </span>
-                                <span className="text-zinc-600 ml-1">({groupMetrics.bestDay[1].size} pibes)</span>
+                                <span className="text-zinc-600 ml-1">({groupMetrics.bestDay[1].size} {groupMetrics.bestDay[1].size === 1 ? t.agenda.person : t.agenda.pibes})</span>
                               </p>
                             </div>
                           )}
@@ -361,13 +383,13 @@ export default function Home() {
                       {/* Invite */}
                       <button onClick={e => { e.stopPropagation(); handleCopyLink(group.id); }}
                         className={`mt-2.5 w-full py-1.5 rounded-xl text-[11px] font-bold flex items-center justify-center gap-1.5 transition-all border ${copiedId === group.id ? 'bg-green-500/10 text-green-400 border-green-500/20' : 'bg-white/5 text-zinc-400 border-white/5 hover:bg-pink-500/10 hover:text-pink-400 hover:border-pink-500/20'}`}>
-                        {copiedId === group.id ? <><CheckCircle size={12} /> ¡Link copiado!</> : <><Share2 size={12} /> Invitar amigos</>}
+                        {copiedId === group.id ? <><CheckCircle size={12} /> {t.groups.linkCopied}</> : <><Share2 size={12} /> {t.groups.inviteBtn}</>}
                       </button>
 
                       {/* Members */}
                       {groupMembers.length > 0 && (
                         <div className="mt-3 pt-3 border-t border-white/8">
-                          <p className="text-[9px] font-black uppercase tracking-widest text-zinc-600 mb-2">Miembros</p>
+                          <p className="text-[9px] font-black uppercase tracking-widest text-zinc-600 mb-2">{t.groups.members}</p>
                           <div className="space-y-2">
                             {groupMembers.map(m => {
                               const stats = computeMemberMetrics(m.id, availabilities);
@@ -376,9 +398,9 @@ export default function Home() {
                                 <div key={m.id} className="flex items-center gap-2">
                                   <img src={m.avatar_url} alt={m.full_name} className="w-6 h-6 rounded-full border border-white/10 shrink-0" />
                                   <div className="flex-1 min-w-0">
-                                    <p className="text-[11px] text-zinc-300 font-semibold leading-tight truncate">{isMe ? 'Vos' : m.full_name?.split(' ')[0]}</p>
+                                    <p className="text-[11px] text-zinc-300 font-semibold leading-tight truncate">{isMe ? t.common.me : m.full_name?.split(' ')[0]}</p>
                                     <p className="text-[9px] text-zinc-600 leading-tight">
-                                      {stats.totalDays > 0 ? `${stats.totalDays} día${stats.totalDays > 1 ? 's' : ''} · ${stats.totalMoments} momento${stats.totalMoments > 1 ? 's' : ''}` : 'Sin pinta marcada'}
+                                      {stats.totalDays > 0 ? `${stats.totalDays} ${stats.totalDays === 1 ? t.agenda.dayThisWeek : t.agenda.daysThisWeek} · ${stats.totalMoments} ${t.groups.timeSlots}` : t.groups.noActivity}
                                     </p>
                                   </div>
                                   {stats.totalMoments >= 4 && <Flame size={12} className="text-orange-400 shrink-0" />}
@@ -391,24 +413,38 @@ export default function Home() {
 
                       {/* 🎮 Game Leaderboard */}
                       {groupScores.length > 0 && (
-                        <div className="mt-3 pt-3 border-t border-white/8">
-                          <div className="flex items-center gap-1.5 mb-2">
-                            <Trophy size={11} className="text-yellow-400" />
-                            <p className="text-[9px] font-black uppercase tracking-widest text-yellow-500">Flappy Pinta</p>
+                        <div className="mt-4 pt-4 border-t border-white/8">
+                          <div className="flex items-center justify-between mb-3">
+                            <div className="flex items-center gap-1.5">
+                              <Trophy size={14} className="text-yellow-400" />
+                              <p className="text-[10px] font-black uppercase tracking-[0.15em] text-yellow-500/90">{t.game.leaderboard.split(' - ')[0]}</p>
+                            </div>
+                            <span className="text-[9px] font-bold text-zinc-600 uppercase tracking-widest px-2 py-0.5 bg-white/5 rounded-full">Top 5</span>
                           </div>
                           <div className="space-y-1.5">
                             {groupScores.slice(0, 5).map((s, i) => {
                               const m = s.profiles;
                               const isMe = s.user_id === user.id;
                               return (
-                                <div key={s.user_id} className={`flex items-center gap-2 rounded-xl px-2 py-1.5 ${isMe ? 'bg-yellow-500/10' : 'bg-white/3'}`}>
-                                  <span className="text-sm w-5 text-center">{medal(i)}</span>
-                                  <img src={m?.avatar_url} className="w-5 h-5 rounded-full border border-white/10" alt="" />
-                                  <p className="flex-1 text-[11px] font-semibold text-zinc-300 truncate">
-                                    {isMe ? 'Vos' : m?.full_name?.split(' ')[0]}
-                                  </p>
-                                  <p className="text-[11px] font-black text-yellow-400">{s.score}</p>
-                                </div>
+                                <motion.div
+                                  key={s.user_id}
+                                  initial={{ opacity: 0, x: -10 }}
+                                  animate={{ opacity: 1, x: 0 }}
+                                  transition={{ delay: i * 0.1 }}
+                                  className={`flex items-center gap-2.5 rounded-2xl px-3 py-2 ${isMe ? 'bg-yellow-500/10 border border-yellow-500/20' : 'bg-white/3 border border-transparent'}`}
+                                >
+                                  <span className="text-sm w-5 flex justify-center shrink-0 font-black">{medal(i)}</span>
+                                  <img src={m?.avatar_url} className="w-6 h-6 rounded-full border border-white/10 shrink-0" alt="" />
+                                  <div className="flex-1 min-w-0">
+                                    <p className={`text-[11px] font-bold truncate ${isMe ? 'text-yellow-200' : 'text-zinc-300'}`}>
+                                      {isMe ? t.common.me : m?.full_name?.split(' ')[0]}
+                                    </p>
+                                  </div>
+                                  <div className="text-right">
+                                    <p className="text-xs font-black text-yellow-400 leading-none">{s.score}</p>
+                                    <p className="text-[8px] font-bold text-zinc-600 uppercase tracking-tighter">pts</p>
+                                  </div>
+                                </motion.div>
                               );
                             })}
                           </div>
@@ -425,8 +461,8 @@ export default function Home() {
         {/* ══ COL 2: MI DISPONIBILIDAD */}
         <section className="border-r border-white/5 p-4 md:p-6 flex flex-col gap-4">
           <div>
-            <h2 className="text-[10px] font-black uppercase tracking-[0.2em] text-zinc-500">Mi Disponibilidad</h2>
-            <p className="text-[10px] text-zinc-700 mt-0.5">Marcá cuándo tenés tiempo libre esta semana</p>
+            <h2 className="text-[10px] font-black uppercase tracking-[0.2em] text-zinc-500">{t.availability.title}</h2>
+            <p className="text-[10px] text-zinc-700 mt-0.5">{t.availability.subtitle}</p>
           </div>
           <div className="flex gap-2 overflow-x-auto pb-1 scrollbar-hide">
             {week.map(day => {
@@ -436,7 +472,7 @@ export default function Home() {
               return (
                 <button key={ds} onClick={() => setSelectedDay(day)}
                   className={`flex flex-col items-center min-w-[52px] py-3 rounded-2xl transition-all relative ${isSel ? 'bg-white text-black shadow-lg' : 'bg-white/5 text-zinc-400 hover:bg-white/10'}`}>
-                  <span className="text-[9px] font-bold uppercase tracking-tight opacity-60 mb-0.5">{format(day, 'EEE', { locale: es })}</span>
+                  <span className="text-[9px] font-bold uppercase tracking-tight opacity-60 mb-0.5">{format(day, 'EEE', { locale: language === 'es' ? es : undefined })}</span>
                   <span className="text-lg font-black leading-none">{format(day, 'd')}</span>
                   {hasData && !isSel && <div className="absolute top-1.5 right-1.5 w-1.5 h-1.5 bg-pink-500 rounded-full" />}
                 </button>
@@ -469,14 +505,14 @@ export default function Home() {
           <div className="relative">
             <MessageSquare size={14} className="absolute left-3.5 top-3.5 text-zinc-600 pointer-events-none" />
             <input type="text" value={currentNote} onChange={e => setMyNotes(prev => ({ ...prev, [dayStr]: e.target.value }))}
-              placeholder='Ej: "vamos al parque 🌳"' maxLength={80}
+              placeholder={t.availability.notePlaceholder} maxLength={80}
               className="w-full bg-white/5 border border-white/8 rounded-2xl pl-9 pr-4 py-3 text-sm text-zinc-200 placeholder-zinc-700 focus:outline-none focus:border-pink-500/50 transition-colors" />
           </div>
           <button onClick={saveAvailability} disabled={saving || currentMoments.length === 0}
             className="w-full py-3.5 premium-gradient text-white font-black rounded-2xl shadow-lg shadow-pink-500/20 hover:scale-[1.01] active:scale-[0.98] transition-all disabled:opacity-40 disabled:cursor-not-allowed flex items-center justify-center gap-2">
             {saving ? <Loader2 size={18} className="animate-spin" />
-              : saved ? <><CheckCircle size={18} /> ¡Pinta confirmada!</>
-                : <><Zap size={18} fill="currentColor" /> Confirmar pinta</>}
+              : saved ? <><CheckCircle size={18} /> {t.availability.confirmed}</>
+                : <><Zap size={18} fill="currentColor" /> {t.availability.confirmBtn}</>}
           </button>
         </section>
 
@@ -485,15 +521,15 @@ export default function Home() {
           {!selectedGroup ? (
             <div className="flex-1 flex flex-col items-center justify-center text-center py-12">
               <Users2 size={28} className="text-zinc-700 mb-3" />
-              <p className="font-bold text-zinc-500">Seleccioná un grupo para ver la agenda</p>
+              <p className="font-bold text-zinc-500">{t.agenda.selectGroup}</p>
             </div>
           ) : (
             <>
               <div>
-                <p className="text-[10px] font-black text-pink-500 uppercase tracking-[0.2em]">Agenda de</p>
+                <p className="text-[10px] font-black text-pink-500 uppercase tracking-[0.2em]">{t.agenda.title}</p>
                 <div className="flex items-center justify-between">
                   <h2 className="font-black text-xl uppercase italic">{selectedGroup.name}</h2>
-                  <button onClick={fetchGroupData} className="text-[10px] font-bold text-zinc-700 hover:text-zinc-400 uppercase tracking-wider transition-colors">Actualizar</button>
+                  <button onClick={fetchGroupData} className="text-[10px] font-bold text-zinc-700 hover:text-zinc-400 uppercase tracking-wider transition-colors">{t.common.refresh}</button>
                 </div>
               </div>
 
@@ -501,8 +537,8 @@ export default function Home() {
                 <div className="flex-1 flex flex-col items-center justify-center text-center border border-dashed border-white/8 rounded-3xl py-12 gap-3">
                   <Coffee size={32} className="text-zinc-700" />
                   <div>
-                    <p className="font-bold text-zinc-500 text-sm">Nadie marcó pinta todavía</p>
-                    <p className="text-[11px] text-zinc-700 mt-1">Confirmá tu disponibilidad en el panel de al lado.</p>
+                    <p className="font-bold text-zinc-500 text-sm">{t.agenda.emptyState}</p>
+                    <p className="text-[11px] text-zinc-700 mt-1">{t.agenda.emptySubtitle}</p>
                   </div>
                 </div>
               ) : (
@@ -515,10 +551,10 @@ export default function Home() {
                         <div className="flex items-center gap-3 mb-3">
                           <div className={`rounded-xl px-3 py-1.5 text-center min-w-[48px] ${isToday ? 'bg-pink-500 text-white' : 'bg-white/8 text-zinc-300'}`}>
                             <p className="text-[9px] font-black uppercase tracking-widest opacity-70 leading-none">
-                              {isToday ? 'HOY' : format(parseISO(day), 'EEE', { locale: es }).toUpperCase()}
+                              {isToday ? (language === 'es' ? 'HOY' : 'TODAY') : format(parseISO(day), 'EEE', { locale: language === 'es' ? es : undefined }).toUpperCase()}
                             </p>
                             <p className="text-xl font-black leading-tight">{format(parseISO(day), 'd')}</p>
-                            <p className="text-[9px] font-bold opacity-60 capitalize leading-none">{format(parseISO(day), 'MMM', { locale: es })}</p>
+                            <p className="text-[9px] font-bold opacity-60 capitalize leading-none">{format(parseISO(day), 'MMM', { locale: language === 'es' ? es : undefined })}</p>
                           </div>
                           <div className="flex-1 border-t border-white/8" />
                           <div className="flex items-center gap-1.5 bg-white/5 rounded-full px-2.5 py-1 shrink-0">
@@ -528,7 +564,7 @@ export default function Home() {
                                 return m ? <img key={s.id} src={m.avatar_url} className="w-5 h-5 rounded-full border-2 border-black" alt="" /> : null;
                               })}
                             </div>
-                            <span className="text-[10px] font-bold text-zinc-400">{uniqueCount} pibe{uniqueCount !== 1 ? 's' : ''}</span>
+                            <span className="text-[10px] font-bold text-zinc-400">{uniqueCount} {uniqueCount === 1 ? t.agenda.person : t.agenda.pibes}</span>
                           </div>
                         </div>
 
@@ -547,10 +583,10 @@ export default function Home() {
                                   <img src={member.avatar_url} alt={member.full_name} className="w-8 h-8 rounded-full border border-white/10 shrink-0" />
                                   <div className="flex-1 min-w-0">
                                     <div className="flex items-center gap-2 flex-wrap">
-                                      <p className="font-bold text-sm">{isMe ? 'Vos' : member.full_name?.split(' ')[0]}</p>
+                                      <p className="font-bold text-sm">{isMe ? t.common.me : member.full_name?.split(' ')[0]}</p>
                                       {stats.totalMoments >= 4 && <Flame size={12} className="text-orange-400" />}
                                       <span className={`text-[9px] px-2 py-0.5 rounded-full font-bold ${isMe ? 'bg-purple-500/15 text-purple-400' : 'bg-pink-500/10 text-pink-400'}`}>
-                                        {stats.totalDays} día{stats.totalDays !== 1 ? 's' : ''} esta semana
+                                        {stats.totalDays} {stats.totalDays === 1 ? t.agenda.dayThisWeek : t.agenda.daysThisWeek}
                                       </span>
                                     </div>
                                     <div className="flex flex-wrap gap-1 mt-1.5">
@@ -580,7 +616,7 @@ export default function Home() {
                                           <CornerDownRight size={12} className="text-zinc-700 shrink-0 mt-1" />
                                           <img src={commenter?.avatar_url} alt="" className="w-5 h-5 rounded-full border border-white/10 shrink-0" />
                                           <div className={`flex-1 rounded-xl px-2.5 py-1.5 ${cIsMe ? 'bg-purple-500/10' : 'bg-white/5'}`}>
-                                            <span className="text-[10px] font-bold text-zinc-400 mr-1.5">{cIsMe ? 'Vos' : commenter?.full_name?.split(' ')[0]}</span>
+                                            <span className="text-[10px] font-bold text-zinc-400 mr-1.5">{cIsMe ? t.common.me : commenter?.full_name?.split(' ')[0]}</span>
                                             <span className="text-[11px] text-zinc-300">{c.content}</span>
                                           </div>
                                         </div>
@@ -597,7 +633,7 @@ export default function Home() {
                                         <CornerDownRight size={12} className="text-zinc-700 shrink-0" />
                                         <input autoFocus type="text" value={replyDraft} onChange={e => setReplyDraft(e.target.value)}
                                           onKeyDown={e => e.key === 'Enter' && postReply(slot.id)}
-                                          placeholder="Escribí tu respuesta..." maxLength={200}
+                                          placeholder={t.agenda.replyPlaceholder} maxLength={200}
                                           className="flex-1 bg-white/5 border border-white/10 rounded-xl px-3 py-1.5 text-xs text-zinc-200 placeholder-zinc-700 focus:outline-none focus:border-pink-500/50 transition-colors" />
                                         <button onClick={() => postReply(slot.id)} disabled={sendingReply || !replyDraft.trim()}
                                           className="w-7 h-7 bg-pink-500 hover:bg-pink-400 rounded-full flex items-center justify-center transition-colors disabled:opacity-40 shrink-0">
@@ -612,7 +648,7 @@ export default function Home() {
                                       <button onClick={() => setReplyingTo(slot.id)}
                                         className="flex items-center gap-1.5 text-[10px] text-zinc-600 hover:text-zinc-400 font-bold transition-colors group">
                                         <CornerDownRight size={11} className="group-hover:text-pink-500 transition-colors" />
-                                        Responder{slotComments.length > 0 ? ` (${slotComments.length})` : ''}
+                                        {t.agenda.reply}{slotComments.length > 0 ? ` (${slotComments.length})` : ''}
                                       </button>
                                     )}
                                   </AnimatePresence>
@@ -653,18 +689,18 @@ export default function Home() {
               className="relative w-full max-w-md bg-zinc-900 rounded-3xl p-6 border border-white/10 shadow-2xl">
               <div className="flex justify-between items-center mb-5">
                 <div>
-                  <h2 className="text-xl font-black italic">NUEVO GRUPO 🤝</h2>
-                  <p className="text-zinc-500 text-xs mt-0.5">Tu grupo tendrá un link único para invitar amigos</p>
+                  <h2 className="text-xl font-black italic">{t.groups.newGroup}</h2>
+                  <p className="text-zinc-500 text-xs mt-0.5">{t.groups.groupDesc}</p>
                 </div>
                 <button onClick={() => setIsGroupModalOpen(false)} className="p-2 hover:bg-white/10 rounded-full transition-colors"><X size={20} /></button>
               </div>
               <form onSubmit={handleCreateGroup} className="space-y-4">
                 <input type="text" autoFocus required value={newGroupName} onChange={e => setNewGroupName(e.target.value)}
-                  placeholder='Ej: "Los del Parque 🌳"'
+                  placeholder={t.groups.groupNamePlaceholder}
                   className="w-full bg-white/5 border border-white/10 rounded-2xl px-4 py-3.5 text-white placeholder-zinc-600 focus:outline-none focus:border-pink-500 transition-colors" />
                 <button type="submit" disabled={creatingGroup || !newGroupName.trim()}
                   className="w-full py-3.5 premium-gradient text-white font-black rounded-2xl shadow-xl shadow-pink-500/20 transition-all disabled:opacity-40">
-                  {creatingGroup ? 'Creando...' : 'CREAR GRUPO'}
+                  {creatingGroup ? t.groups.creating : t.groups.createBtn}
                 </button>
               </form>
             </motion.div>

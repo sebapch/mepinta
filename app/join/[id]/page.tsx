@@ -7,7 +7,10 @@ import { motion } from 'framer-motion';
 import { Users2, Loader2, CheckCircle2, AlertCircle } from 'lucide-react';
 import { GlassCard } from '../../../components/UI';
 
+import { useLanguage } from '../../../components/LanguageContext';
+
 export default function JoinGroupPage() {
+    const { t } = useLanguage();
     const router = useRouter();
     const { id } = useParams();
     const [loading, setLoading] = useState(true);
@@ -24,7 +27,7 @@ export default function JoinGroupPage() {
                 .single();
 
             if (error || !data) {
-                setError('El grupo no existe o el link expiró.');
+                setError(t.join.error);
                 setLoading(false);
                 return;
             }
@@ -44,7 +47,7 @@ export default function JoinGroupPage() {
         };
 
         if (id) checkGroup();
-    }, [id, router]);
+    }, [id, router, t]);
 
     const handleJoin = async () => {
         setJoining(true);
@@ -57,7 +60,7 @@ export default function JoinGroupPage() {
             .upsert({ group_id: id, user_id: user.id });
 
         if (joinError) {
-            setError('No pudimos unirte al grupo. Intentá de nuevo.');
+            setError(t.join.error);
             setJoining(false);
         } else {
             router.push('/');
@@ -101,9 +104,9 @@ export default function JoinGroupPage() {
                     <div className="w-20 h-20 bg-pink-500/10 rounded-3xl flex items-center justify-center mx-auto mb-6 text-pink-500">
                         <Users2 size={40} />
                     </div>
-                    <p className="text-[10px] font-black uppercase tracking-[0.3em] text-pink-500 mb-2">Invitación Especial</p>
-                    <h1 className="text-3xl font-black mb-2 uppercase italic">{group.name}</h1>
-                    <p className="text-zinc-400 mb-10">Te invitaron a este grupo para coordinar salidas y ver quién tiene pinta.</p>
+                    <p className="text-[10px] font-black uppercase tracking-[0.3em] text-pink-500 mb-2">{t.join.title}</p>
+                    <h1 className="text-3xl font-black mb-2 uppercase italic">{group?.name}</h1>
+                    <p className="text-zinc-400 mb-10">{t.join.description}</p>
 
                     <button
                         onClick={handleJoin}
@@ -113,7 +116,7 @@ export default function JoinGroupPage() {
                         {joining ? <Loader2 className="animate-spin" size={24} /> : (
                             <>
                                 <CheckCircle2 size={24} />
-                                UNIRME AL GRUPO
+                                {t.join.joinBtn}
                             </>
                         )}
                     </button>
